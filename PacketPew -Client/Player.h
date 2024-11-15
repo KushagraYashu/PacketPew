@@ -1,0 +1,54 @@
+//author: Kushagra
+
+//Player header file
+
+#pragma once
+
+//cpp headers
+#include<iostream>
+
+//sfml headers
+#include<SFML/Network.hpp>
+#include<SFML/Graphics.hpp>
+
+class Player {
+public: 
+	Player(); //default constructor
+	Player(sf::Texture& playerTexture, sf::Texture& gunTex, float moveRate, sf::RenderWindow& window); //set the whole player
+	
+	void SetPlayerSprite(sf::Texture& playerTexture, sf::RenderWindow& window); //set texture, set origin, position to window centre
+	void SetGunSprite(sf::Texture& gunTexture); //set texture, origin, and position relative to the player
+	sf::Sprite& GetPlayerSprite(); //return a pointer to player sprite
+	void UpdatePlayerRotation(sf::RenderWindow& window);
+
+	void draw(sf::RenderWindow& window);
+
+	float GetMoveRate(); //return a copy to move rate
+	void SetMoveRate(float moveRate); //set the move rate
+
+	void CheckMove();
+	void MoveLeft(bool left);
+	void MoveRight(bool right);
+	void MoveUp(bool up);
+	void MoveDown(bool down);
+
+private:
+	void PerformMove(int directionX, int directionY);
+
+	//player variables
+	sf::Sprite m_playerSprite;
+	sf::Sprite m_gunSprite;
+	sf::Vector2f m_gunOffset;
+
+	//move variables
+	float m_moveRate;
+	float m_minX = 29.f; 
+	float m_minY = 29.f; 
+	float m_maxX; 
+	float m_maxY;
+	bool m_moveLeft = false;
+	bool m_moveRight = false;
+	bool m_moveUp = false;
+	bool m_moveDown = false;
+
+};
