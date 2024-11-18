@@ -138,12 +138,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Bullet.cpp" />
     <ClCompile Include="Client.cpp" />
     <ClCompile Include="CustomBoundaries.cpp" />
     <ClCompile Include="CustomTexture.cpp" />
     <ClCompile Include="Player.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Bullet.h" />
     <ClInclude Include="CustomTexture.h" />
     <ClInclude Include="CustomWindow.cpp" />
     <ClInclude Include="Player.h" />

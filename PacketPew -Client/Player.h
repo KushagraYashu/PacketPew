@@ -4,6 +4,9 @@
 
 #pragma once
 
+//custom headers
+#include "Bullet.h"
+
 //cpp headers
 #include<iostream>
 
@@ -20,8 +23,9 @@ public:
 	void SetGunSprite(sf::Texture& gunTexture); //set texture, origin, and position relative to the player
 	sf::Sprite& GetPlayerSprite(); //return a pointer to player sprite
 	void UpdatePlayerRotation(sf::RenderWindow& window);
+	void Fire(sf::Texture& bulletTex);
 
-	void draw(sf::RenderWindow& window);
+	void draw(sf::RenderWindow& window, float deltaTime);
 
 	float GetMoveRate(); //return a copy to move rate
 	void SetMoveRate(float moveRate); //set the move rate
@@ -39,6 +43,8 @@ private:
 	sf::Sprite m_playerSprite;
 	sf::Sprite m_gunSprite;
 	sf::Vector2f m_gunOffset;
+	std::vector<Bullet> m_bullets;
+	float m_bulletSpeed = 300.f;
 
 	//move variables
 	float m_moveRate;

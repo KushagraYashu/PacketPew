@@ -2,12 +2,80 @@
 
 //cpp headers
 #include <iostream>
+#include <list>
 
 //sfml headers
 #include <SFML/Network.hpp>
 #include <SFML/Graphics.hpp>
 
 using namespace std;
+
+const int SELECTOR_WAIT_TIME_MS = 200;
+const int MAX_CLIENTS = 2;
+
+void AddClients(sf::TcpListener& serverListener, list<sf::TcpSocket*>& clients, sf::SocketSelector& selector) {
+    auto* client = new sf::TcpSocket();
+    client->setBlocking(false);
+    sf::Packet welcomePacket;
+    string msg;
+    if (serverListener.accept(*client) == sf::Socket::Done) {
+        if (clients.size() < MAX_CLIENTS) {
+            msg = "1";
+            welcomePacket << msg;
+            if (client->send(welcomePacket) == sf::Socket::Done) {
+                printf("A client connected at port %d and address %s\n", client->getRemotePort(), client->getRemoteAddress().toString().data());
+                clients.push_back(client);
+                std::cout << "Total clients connected " << clients.size() << std::endl;
+                selector.add(*client);
+            }
+        }
+        else {
+            msg = "-1";
+            welcomePacket << msg;
+            client->send(welcomePacket);
+            client->disconnect();
+            delete client;
+        }
+    }
+    else {
+        delete client;
+    }
+}
+
+string RecieveFromClient(sf::TcpSocket& client, list<sf::TcpSocket*>& clients, sf::SocketSelector& selector) {
+    sf::Packet clientDataPacket;
+    sf::Socket::Status tcpRecvStat = client.receive(clientDataPacket);
+    if (tcpRecvStat == sf::Socket::Disconnected) {
+        //error...
+        cerr << "A client disconnected\n";
+        clients.remove(&client);
+        selector.remove(client);
+        client.disconnect();
+        printf("waiting for a new connection\n");
+        return "-1";
+    }
+    string msg;
+    clientDataPacket >> msg;
+    return msg;
+}
+
+void BroadcastToAll(list<sf::TcpSocket*>& clients, string& msg, sf::SocketSelector& selector) {
+    sf::Packet sendPacket;
+    sendPacket << msg;
+    list<sf::TcpSocket*> clientsCopy = clients;
+    for (std::list<sf::TcpSocket*>::iterator SendIt = clientsCopy.begin(); SendIt != clientsCopy.end(); ++SendIt) {
+        sf::TcpSocket& sendClient = **SendIt;
+        sf::Socket::Status tcpSendStat = sendClient.send(sendPacket);
+        if (tcpSendStat == sf::Socket::Disconnected) {
+            //error...
+            cerr << "removed a client from the list\n";
+            clients.remove(&sendClient);
+            selector.remove(sendClient);
+            sendClient.disconnect();
+            continue;
+        }
+    }
+}
 
 int main()
 {
@@ -16,69 +84,51 @@ int main()
     string projectFullName = "PacketPew Server ";
     projectFullName.append(versionNo);
 
-    //creating a window
-    sf::RenderWindow window(sf::VideoMode(1280, 720), projectFullName, sf::Style::Titlebar | sf::Style::Close);
+    //setting server variables
+    int port = 6969;
+    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this in a way that you can connect to the same machines on the network
+    sf::TcpListener serverListener;
 
-    //setting up v-sync
-    //window.setVerticalSyncEnabled(true);
+    //clients
+    std::list<sf::TcpSocket*> clients;
 
-    //limiting the fps
-    //window.setFramerateLimit(165);
+    //selector (for non blocking)
+    sf::SocketSelector selector;
 
-    //setting up the icon
-    sf::Image icon;
-    if (!icon.loadFromFile("Icon/demo.png")) {
-        std::cerr << "Error loading icon file" << std::endl;
-        return -1;
+    // bind the server to a port
+    if (serverListener.listen(port, serverIP) != sf::Socket::Done)
+    {
+        // error...
+        cerr << "\nerror in binding the server port";
     }
-    window.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
-
-    //setting up the fps text
-    sf::Text fpsText;
-    sf::Font dotoFont, robotoFont;
-    if (!dotoFont.loadFromFile("Fonts/Doto/Doto-Bold.ttf")) {
-        std::cerr << "Error loading font file" << std::endl;
-        return -1;
+    else {
+        std::string addr = serverIP.toString();
+        printf("\nlistening at port %d and address %s\n", port, addr.data());
+        selector.add(serverListener);
     }
-    if (!robotoFont.loadFromFile("Fonts/Roboto/Roboto-Regular.ttf")) {
-        std::cerr << "Error loading font file" << std::endl;
-        return -1;
-    }
-    fpsText.setFont(robotoFont);
-    fpsText.setCharacterSize(18);
-    fpsText.setFillColor(sf::Color::Cyan);
-    fpsText.setPosition(5.f, 5.f);
-    float fps = 0.0f;
 
-    //setting up a clock (for now, only being used by FPS)
-    sf::Clock clock;
-
-    //run the program as long as the window is open
-    while (window.isOpen()) {
-
-        //checking all the window events that were triggered since the last iteration of this game loop
-        sf::Event event;
-        while (window.pollEvent(event)) {
-
-            //if the event is close, close the window
-            if (event.type == sf::Event::Closed) {
-                window.close();
+    while (true) {
+        if (selector.wait(sf::milliseconds(SELECTOR_WAIT_TIME_MS))) {
+            //handling new connections
+            if (selector.isReady(serverListener)) {
+                AddClients(serverListener, clients, selector);
+            }
+            else {
+                list<sf::TcpSocket*> clientsCopy = clients;
+                for (std::list<sf::TcpSocket*>::iterator it = clientsCopy.begin(); it != clientsCopy.end(); ++it) {
+                    sf::TcpSocket& client = **it;
+                    if (selector.isReady(client)) {
+                        string msg = RecieveFromClient(client, clients, selector);
+                        if (msg == "-1") {
+                            cerr << "error in recieving from a client\n";
+                        }
+                        else {
+                            BroadcastToAll(clients, msg, selector);
+                        }
+                    }
+                }
             }
         }
-
-        //calculating and setting fps
-        float frameTime = clock.restart().asSeconds();
-        fps = 1.0f / frameTime;
-        fpsText.setString("FPS: " + to_string(static_cast<int>(fps)));
-
-        //clearing the window
-        window.clear(sf::Color(0, 0, 0, 255));
-
-        //drawing the fps text
-        window.draw(fpsText);
-
-        //displaying everything that has been rendered to the window so far
-        window.display();
     }
 
     return 0;

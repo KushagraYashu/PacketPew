@@ -3,6 +3,9 @@
 //including player header file
 #include "Player.h"
 
+//custom headers
+
+
 //cpp headers
 #include <algorithm>
 #include <iostream>
@@ -49,9 +52,15 @@ void Player::UpdatePlayerRotation(sf::RenderWindow& window) {
 	m_gunSprite.setRotation(angleDegrees);
 }
 
-void Player::draw(sf::RenderWindow& window) {
+void Player::Fire(sf::Texture& bulletTex) {
+	CreateBullet(m_bullets, bulletTex, m_playerSprite.getPosition(), m_playerSprite.getRotation(), m_bulletSpeed);
+}
+
+void Player::draw(sf::RenderWindow& window, float deltaTime) {
 	UpdatePlayerRotation(window);
 	window.draw(m_playerSprite);
+	UpdateBullets(m_bullets, deltaTime);
+	RenderBullets(m_bullets, window);
 	window.draw(m_gunSprite);
 }
 
