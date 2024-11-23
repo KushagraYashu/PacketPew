@@ -43,9 +43,14 @@ sf::Sprite& Player::GetPlayerSprite()
 	return m_playerSprite;
 }
 
+void Player::SetPlayerPosition(sf::Vector2f pos) {
+	m_playerSprite.setPosition(pos);
+	m_gunSprite.setPosition(m_playerSprite.getPosition());
+}
+
 void Player::UpdatePlayerRotation(sf::RenderWindow& window) {
 	sf::Vector2f playerPos = m_playerSprite.getPosition();
-	sf::Vector2i mousePos = sf::Mouse::getPosition();
+	sf::Vector2i mousePos = sf::Mouse::getPosition(window);
 	float angle = std::atan2(mousePos.y - playerPos.y, mousePos.x - playerPos.x);
 	float angleDegrees = angle * 180.f / 3.14159f;
 	m_playerSprite.setRotation(angleDegrees);
@@ -75,7 +80,9 @@ float Player::GetMoveRate() {
 void Player::PerformMove(int directionX, int directionY) {
 	int dx = (directionX != 0) ? directionX / abs(directionX) : 0;
 	int dy = (directionY != 0) ? directionY / abs(directionY) : 0;
-	sf::Vector2f newPos = m_playerSprite.getPosition() + sf::Vector2f(dx * m_moveRate, dy * m_moveRate);
+	float length = sqrt((dx * dx) + (dy * dy));
+	sf::Vector2f direction = sf::Vector2f(dx / length, dy / length);
+	sf::Vector2f newPos = m_playerSprite.getPosition() + sf::Vector2f(direction.x * m_moveRate, direction.y * m_moveRate);
 	float clampedPosX = std::clamp(newPos.x, m_minX, m_maxX);
 	float clampedPosY = std::clamp(newPos.y, m_minY, m_maxY);
 	m_playerSprite.setPosition(clampedPosX, clampedPosY);

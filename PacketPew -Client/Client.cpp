@@ -9,11 +9,16 @@
 
 //custom headers
 #include "Player.h"
-#include "CustomWindow.cpp"
+#include "Enemy.h"
 #include "CustomTexture.h"
+#include "PacketExtension.h"
+#include "CustomWindow.cpp"
 #include "CustomBoundaries.cpp"
 
 using namespace std;
+
+const int SCREEN_WIDTH = 1280;
+const int SCREEN_HEIGHT = 720;
 
 int main() {
 	//debug msg (ignore)
@@ -36,18 +41,32 @@ int main() {
     }
     else {
         sf::Packet welcomePacket;
-        client.receive(welcomePacket);
+        if (client.receive(welcomePacket) != sf::Socket::Done) {
+            cerr << "something's wrong with welcome msg";
+            return -1;
+        }
         string msg;
         welcomePacket >> msg;
         if (msg == "-1") {
             cerr << "Server cant accommodate you right now, sorry\n";
             return 0;
         }
-        else if (msg == "1") {
+        else {
             cout << "Welcome to \"Packet Pew\"\nPress \"Y\" for playing: ";
             char accept;
             cin >> accept;
             if (accept == 'Y' || accept == 'y') {
+                
+                client.setBlocking(false);
+                sf::Packet playing;
+                playing << 1 << "PLAYER_PLAYING";
+                if (client.send(playing) != sf::Socket::Done) {
+                    cerr << "couldn't send PLAYER_PLAYING\n";
+                    return -1;
+                }
+
+                sf::Vector2f iniPosition = sf::Vector2f(SCREEN_WIDTH * 0.3f * stoi(msg), SCREEN_HEIGHT * 0.5f);
+
                 //creating an icon
                 sf::Image icon;
                 if (!icon.loadFromFile("Icon/demo.png")) {
@@ -68,6 +87,9 @@ int main() {
                 //creating player
                 float moveRate = 1.0f;
                 Player player(playerTex.getTex(), gunTex.getTex(), moveRate, window);
+                player.SetPlayerPosition(iniPosition);
+                int noEnemies = 0;
+                Enemy enemy;
 
                 //setting up boundaries
                 Texture boundTex;
@@ -77,12 +99,22 @@ int main() {
 
                 //clock
                 sf::Clock clock;
+                sf::Clock networkClock;
+                sf::Time posTimeInterval = sf::milliseconds(50);
+                sf::Vector2f lastPos = sf::Vector2f();
+                float lastRot = 0;
+                float enemyRot = 0;
+                sf::Vector2f enemyPos;
 
                 //GAME LOOP
                 while (window.isOpen()) {
+                    
                     sf::Packet demo;
+                    demo << 1 << "SERVER_LIVE_CHECK";
                     if (client.send(demo) != sf::Socket::Done) {
+                        cerr << "couldn't send SERVER_LIVE_CHECK\n";
                         window.close();
+                        return -1;
                     }
 
                     //handling events
@@ -138,8 +170,72 @@ int main() {
                     //clear
                     window.clear(sf::Color::Black);
 
+                    float deltaTime = clock.restart().asSeconds();
+
+                    if (networkClock.getElapsedTime() >= posTimeInterval) {
+                        sf::Packet playerPosRot;
+                        playerPosRot << 1 << "PLAYER_POS_ROT" << player.GetPlayerSprite().getPosition() << player.GetPlayerSprite().getRotation();
+                        if (client.send(playerPosRot) != sf::Socket::Done) {
+                            cerr << "couldn't send ENEMY_POS_ROT\n";
+                            window.close();
+                            return -1;
+                        }
+                        networkClock.restart();
+                    }
+
+                    sf::Packet serverPacket;
+                    string type;
+
+                    sf::Socket::Status stat = client.receive(serverPacket);
+                    if (stat == sf::Socket::NotReady) {
+                        //not ready
+                    }
+                    else if (stat == sf::Socket::Disconnected) {
+                        cerr << "couldn't receive from server, server is offline\n";
+                        window.close();
+                        return -1;
+                    }
+                    else if (stat != sf::Socket::Done) {
+                        cerr << "something bad happend, couldnt receive from server\n";
+                        window.close();
+                        return -1;
+                    }
+                    serverPacket >> type;
+
+                    if (type == "ENEMIES_NO") {
+                        int no;
+                        serverPacket >> no;
+                        noEnemies = no;
+                        enemy.SetAll(playerTex.getTex(), gunTex.getTex(), moveRate, window);
+                        serverPacket >> enemyRot;
+                        if (stoi(msg) % 2 != 0) {
+                            enemyPos = sf::Vector2f(SCREEN_WIDTH * 0.3f * (noEnemies + 1), SCREEN_HEIGHT * 0.5f);
+                        }
+                        else {
+                            enemyPos = sf::Vector2f(SCREEN_WIDTH * 0.3f * (noEnemies), SCREEN_HEIGHT * 0.5f);
+                        }
+
+                    }
+
+                    if (type == "ENEMY_POS_ROT") {
+                        serverPacket >> enemyPos;
+                        serverPacket >> enemyRot;
+                        cout << "X: " << enemyPos.x << " Y: " << enemyPos.y << endl;
+                        cout << "Rot: " << enemyRot << endl;
+                    }
+
+                    if (lastPos != enemyPos) { 
+                        lastPos = enemyPos;
+                    }
+                    if (lastRot != enemyRot) {
+                        lastRot = enemyRot;
+                    }
+                    
                     //draw
-                    player.draw(window, clock.restart().asSeconds()); //player and bullets
+                    player.draw(window, deltaTime); //player and bullets
+                    if (noEnemies != 0) { //enemy logic
+                        enemy.draw(window, deltaTime, lastPos, lastRot);
+                    }
 
                     DisplayBoundaries(boundarySprites, window);//displaying boundaries
 
@@ -152,7 +248,6 @@ int main() {
             }
         }
 
-        
     }
 
 	return 0;

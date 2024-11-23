@@ -130,7 +130,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="PacketExtension.cpp" />
     <ClCompile Include="PacketPew -Server.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PacketExtension.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

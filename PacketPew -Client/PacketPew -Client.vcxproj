@@ -142,12 +142,16 @@
     <ClCompile Include="Client.cpp" />
     <ClCompile Include="CustomBoundaries.cpp" />
     <ClCompile Include="CustomTexture.cpp" />
+    <ClCompile Include="Enemy.cpp" />
+    <ClCompile Include="PacketExtension.cpp" />
     <ClCompile Include="Player.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bullet.h" />
     <ClInclude Include="CustomTexture.h" />
     <ClInclude Include="CustomWindow.cpp" />
+    <ClInclude Include="Enemy.h" />
+    <ClInclude Include="PacketExtension.h" />
     <ClInclude Include="Player.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
