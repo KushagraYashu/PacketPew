@@ -29,6 +29,7 @@ void Enemy::SetAll(sf::Texture& playerTex, sf::Texture& gunTex, float moveRate, 
 
 void Enemy::SetEnemySprite(sf::Texture& playerTex, sf::RenderWindow& window) {
 	m_enemySprite.setTexture(playerTex); //setting the texture
+	m_enemySprite.setColor(sf::Color::Magenta);
 	m_enemySprite.setOrigin(m_enemySprite.getLocalBounds().width / 2, m_enemySprite.getLocalBounds().height / 2); //setting the origin
 	m_enemySprite.setPosition((float)window.getSize().x / 2, (float)window.getSize().y / 2); //setting position to window center
 	m_gunOffset = sf::Vector2f(m_enemySprite.getLocalBounds().width / 2, 0);
@@ -66,9 +67,9 @@ void Enemy::Fire(sf::Texture& bulletTex) {
 void Enemy::draw(sf::RenderWindow& window, float deltaTime, sf::Vector2f position, float angle) {
 	SetEnemyPosition(position);
 	UpdateEnemyRotation(angle);
-	window.draw(m_enemySprite);
 	UpdateBullets(m_bullets, deltaTime);
 	RenderBullets(m_bullets, window);
+	window.draw(m_enemySprite);
 	window.draw(m_gunSprite);
 }
 

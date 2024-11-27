@@ -23,6 +23,7 @@ struct ClientData {
     int index;
     sf::Vector2f position;
     float rotation;
+    bool isFiring;
 };
 list<ClientData> clientDataList;
 
@@ -202,6 +203,11 @@ int main()
                                     BroadcastToAll(clients, client, enemyPos, selector);
                                     broadcastClock.restart();
                                 }
+                            }
+                            if (type == "PLAYER_FIRE") {
+                                sf::Packet enemyFire;
+                                enemyFire << "ENEMY_FIRE";
+                                BroadcastToAll(clients, client, enemyFire, selector);
                             }
                         }
                         

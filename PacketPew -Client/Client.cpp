@@ -21,6 +21,7 @@ const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
 
 int main() {
+
 	//debug msg (ignore)
 	cout << "hello from client\n";
 
@@ -76,7 +77,7 @@ int main() {
 
                 //creating a window
                 sf::RenderWindow window;
-                CreateWindow(window, projectFullName, true, 8, icon);
+                CreateGameWindow(window, projectFullName, false, 120, 8, icon);
 
                 //setting up player related textures
                 Texture playerTex, gunTex, bulletTex;
@@ -85,7 +86,7 @@ int main() {
                 bulletTex.CreateTexture("bullet.png", true, false);
 
                 //creating player
-                float moveRate = 1.0f;
+                float moveRate = 2.0f;
                 Player player(playerTex.getTex(), gunTex.getTex(), moveRate, window);
                 player.SetPlayerPosition(iniPosition);
                 int noEnemies = 0;
@@ -116,6 +117,7 @@ int main() {
                         window.close();
                         return -1;
                     }
+
 
                     //handling events
                     sf::Event event;
@@ -159,6 +161,13 @@ int main() {
                             if (event.mouseButton.button == sf::Mouse::Left)
                             {
                                 player.Fire(bulletTex.getTex());//Firing
+                                sf::Packet playerFire;
+                                playerFire << 1 << "PLAYER_FIRE";
+                                if (client.send(playerFire) != sf::Socket::Done) {
+                                    cerr << "couldn't send PLAYER_FIRE\n";
+                                    window.close();
+                                    return -1;
+                                }
                             }
                             break;
                         }
@@ -176,7 +185,7 @@ int main() {
                         sf::Packet playerPosRot;
                         playerPosRot << 1 << "PLAYER_POS_ROT" << player.GetPlayerSprite().getPosition() << player.GetPlayerSprite().getRotation();
                         if (client.send(playerPosRot) != sf::Socket::Done) {
-                            cerr << "couldn't send ENEMY_POS_ROT\n";
+                            cerr << "couldn't send PLAYER_POS_ROT\n";
                             window.close();
                             return -1;
                         }
@@ -224,13 +233,17 @@ int main() {
                         cout << "Rot: " << enemyRot << endl;
                     }
 
+                    if (type == "ENEMY_FIRE") {
+                        enemy.Fire(bulletTex.getTex());
+                    }
+
                     if (lastPos != enemyPos) { 
                         lastPos = enemyPos;
                     }
                     if (lastRot != enemyRot) {
                         lastRot = enemyRot;
                     }
-                    
+
                     //draw
                     player.draw(window, deltaTime); //player and bullets
                     if (noEnemies != 0) { //enemy logic
