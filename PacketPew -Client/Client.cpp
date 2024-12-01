@@ -1,13 +1,14 @@
 //author: Kushagra
 
 //cpp headers
-#include<iostream>
+#include <iostream>
 
 //sfml headers
 #include<SFML/Network.hpp>
 #include<SFML/Graphics.hpp>
 
 //custom headers
+#include "NetworkingThread.h"
 #include "Player.h"
 #include "Enemy.h"
 #include "CustomTexture.h"
@@ -32,17 +33,16 @@ int main() {
 
     //networking things
     int port = 6969;
-    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this so you can input a string from the user to connect to the server
-    sf::TcpSocket client;
+    sf::IpAddress serverIP = sf::IpAddress("10.167.198.12"); //TODO: change this so you can input a string from the user to connect to the server
 
     //connect to server
-    sf::Socket::Status tcpConnectStat = client.connect(serverIP, port);
+    sf::Socket::Status tcpConnectStat = socket.connect(serverIP, port);
     if (tcpConnectStat != sf::Socket::Done) {
         cerr << "couldnt connect to the server at " << serverIP.toString();
     }
     else {
         sf::Packet welcomePacket;
-        if (client.receive(welcomePacket) != sf::Socket::Done) {
+        if (socket.receive(welcomePacket) != sf::Socket::Done) {
             cerr << "something's wrong with welcome msg";
             return -1;
         }
@@ -58,15 +58,16 @@ int main() {
             cin >> accept;
             if (accept == 'Y' || accept == 'y') {
                 
-                client.setBlocking(false);
+                socket.setBlocking(false);
                 sf::Packet playing;
                 playing << 1 << "PLAYER_PLAYING";
-                if (client.send(playing) != sf::Socket::Done) {
+                if (socket.send(playing) != sf::Socket::Done) {
                     cerr << "couldn't send PLAYER_PLAYING\n";
                     return -1;
                 }
 
                 sf::Vector2f iniPosition = sf::Vector2f(SCREEN_WIDTH * 0.3f * stoi(msg), SCREEN_HEIGHT * 0.5f);
+
 
                 //creating an icon
                 sf::Image icon;
@@ -86,7 +87,7 @@ int main() {
                 bulletTex.CreateTexture("bullet.png", true, false);
 
                 //creating player
-                float moveRate = 2.0f;
+                float moveRate = 4.0f;
                 Player player(playerTex.getTex(), gunTex.getTex(), moveRate, window);
                 player.SetPlayerPosition(iniPosition);
                 int noEnemies = 0;
@@ -101,23 +102,14 @@ int main() {
                 //clock
                 sf::Clock clock;
                 sf::Clock networkClock;
+                sf::Clock serverResponseClock;
                 sf::Time posTimeInterval = sf::milliseconds(50);
-                sf::Vector2f lastPos = sf::Vector2f();
-                float lastRot = 0;
-                float enemyRot = 0;
-                sf::Vector2f enemyPos;
+
+                //network thread
+                thread networkThread(NetworkingThread);
 
                 //GAME LOOP
                 while (window.isOpen()) {
-                    
-                    sf::Packet demo;
-                    demo << 1 << "SERVER_LIVE_CHECK";
-                    if (client.send(demo) != sf::Socket::Done) {
-                        cerr << "couldn't send SERVER_LIVE_CHECK\n";
-                        window.close();
-                        return -1;
-                    }
-
 
                     //handling events
                     sf::Event event;
@@ -161,12 +153,12 @@ int main() {
                             if (event.mouseButton.button == sf::Mouse::Left)
                             {
                                 player.Fire(bulletTex.getTex());//Firing
+                                //adding firing packet to the vector
                                 sf::Packet playerFire;
                                 playerFire << 1 << "PLAYER_FIRE";
-                                if (client.send(playerFire) != sf::Socket::Done) {
-                                    cerr << "couldn't send PLAYER_FIRE\n";
-                                    window.close();
-                                    return -1;
+                                {
+                                    lock_guard<mutex> lock(networkMutex);
+                                    toSend.push_back(playerFire);
                                 }
                             }
                             break;
@@ -174,7 +166,19 @@ int main() {
                     }
 
                     //player related actions
-                    player.CheckMove();//moving
+                    sf::Vector2f playerMovDir = player.CheckMove();//moving
+                    if (playerMovDir.x != 0 || playerMovDir.y != 0) {
+                        sf::Packet playerAct;
+                        playerAct << 1 << "PLAYER_ACTION_MOVE" << playerMovDir << player.GetMoveRate() << player.GetPlayerSprite().getPosition();
+                        {
+                            lock_guard<mutex> lock(networkMutex);
+                            toSend.push_back(playerAct);
+                        }
+                        cerr << "sending i want to move in :" << playerMovDir.x << "\t" << playerMovDir.y << endl;
+                    }
+                    //moving the player, assuming the server will respond with the same position
+                    if (playerMovDir.x != 0 || playerMovDir.y != 0)
+                        player.MovePredicted(playerMovDir);
 
                     //clear
                     window.clear(sf::Color::Black);
@@ -184,77 +188,102 @@ int main() {
                     if (networkClock.getElapsedTime() >= posTimeInterval) {
                         sf::Packet playerPosRot;
                         playerPosRot << 1 << "PLAYER_POS_ROT" << player.GetPlayerSprite().getPosition() << player.GetPlayerSprite().getRotation();
-                        if (client.send(playerPosRot) != sf::Socket::Done) {
-                            cerr << "couldn't send PLAYER_POS_ROT\n";
-                            window.close();
-                            return -1;
+                        {
+                            lock_guard<mutex> lock(networkMutex);
+                            toSend.push_back(playerPosRot);
                         }
                         networkClock.restart();
                     }
 
-                    sf::Packet serverPacket;
-                    string type;
-
-                    sf::Socket::Status stat = client.receive(serverPacket);
-                    if (stat == sf::Socket::NotReady) {
-                        //not ready
-                    }
-                    else if (stat == sf::Socket::Disconnected) {
-                        cerr << "couldn't receive from server, server is offline\n";
-                        window.close();
-                        return -1;
-                    }
-                    else if (stat != sf::Socket::Done) {
-                        cerr << "something bad happend, couldnt receive from server\n";
-                        window.close();
-                        return -1;
-                    }
-                    serverPacket >> type;
-
-                    if (type == "ENEMIES_NO") {
-                        int no;
-                        serverPacket >> no;
-                        noEnemies = no;
-                        enemy.SetAll(playerTex.getTex(), gunTex.getTex(), moveRate, window);
-                        serverPacket >> enemyRot;
-                        if (stoi(msg) % 2 != 0) {
-                            enemyPos = sf::Vector2f(SCREEN_WIDTH * 0.3f * (noEnemies + 1), SCREEN_HEIGHT * 0.5f);
+                    {
+                        lock_guard<mutex> lock(networkMutex);
+                        if (serverPackets.size() >= MAX_QUEUE_SIZE) {
+                            cerr << "\t\t\t\t\t\tDropping 1\n";
+                            serverPackets.pop();
                         }
-                        else {
-                            enemyPos = sf::Vector2f(SCREEN_WIDTH * 0.3f * (noEnemies), SCREEN_HEIGHT * 0.5f);
+                        while (!serverPackets.empty()) {
+                            sf::Packet curPacket = serverPackets.front();
+                            serverPackets.pop();
+                            
+                            string type;
+                            curPacket >> type;
+
+                            
+                            if (type == "PLAYER_POS") {
+                                sf::Vector2f newPos;
+                                curPacket >> newPos;
+                                cerr << "receiving position as : " << newPos.x << "\t" << newPos.y << endl;
+                                float clampedX = clamp(newPos.x, player.GetMinX(), player.GetMaxX());
+                                float clampedY = clamp(newPos.y, player.GetMinY(), player.GetMaxY());
+                                sf::Vector2f serverPlayerPos(clampedX, clampedY);
+                                if (player.GetPlayerSprite().getPosition() != serverPlayerPos) {
+                                    player.GetPlayerSprite().setPosition(player.GetPlayerSprite().getPosition() + (serverPlayerPos - player.GetPlayerSprite().getPosition()) * serverResponseClock.getElapsedTime().asSeconds());
+                                    serverResponseClock.restart();
+                                }
+                                
+                                //player.Move(newPos);
+                                break;
+                            }
+
+                            if (type == "ENEMY_POS_ROT") {
+                                curPacket >> enemyPos;
+                                curPacket >> enemyRot;
+                                cout << "X: " << enemyPos.x << " Y: " << enemyPos.y << endl;
+                                cout << "Rot: " << enemyRot << endl;
+                                if (lastEnemyPos != enemyPos) {
+                                    lastEnemyPos = enemyPos;
+                                }
+                                if (lastEnemyRot != enemyRot) {
+                                    lastEnemyRot = enemyRot;
+                                }
+                                break;
+                            }
+
+                            if (type == "ENEMY_FIRE") {
+                                enemy.Fire(bulletTex.getTex());
+                            }
+
+                             if (type == "ENEMIES_NO") {
+                                int no;
+                                curPacket >> no;
+                                noEnemies = no;
+                                enemy.SetAll(playerTex.getTex(), gunTex.getTex(), moveRate, window);
+                                curPacket >> enemyRot;
+                                if (stoi(msg) % 2 != 0) {
+                                    enemyPos = sf::Vector2f(SCREEN_WIDTH * 0.3f * (noEnemies + 1), SCREEN_HEIGHT * 0.5f);
+                                }
+                                else {
+                                    enemyPos = sf::Vector2f(SCREEN_WIDTH * 0.3f * (noEnemies), SCREEN_HEIGHT * 0.5f);
+                                }
+
+                            }
                         }
-
                     }
-
-                    if (type == "ENEMY_POS_ROT") {
-                        serverPacket >> enemyPos;
-                        serverPacket >> enemyRot;
-                        cout << "X: " << enemyPos.x << " Y: " << enemyPos.y << endl;
-                        cout << "Rot: " << enemyRot << endl;
-                    }
-
-                    if (type == "ENEMY_FIRE") {
-                        enemy.Fire(bulletTex.getTex());
-                    }
-
-                    if (lastPos != enemyPos) { 
-                        lastPos = enemyPos;
-                    }
-                    if (lastRot != enemyRot) {
-                        lastRot = enemyRot;
-                    }
-
                     //draw
                     player.draw(window, deltaTime); //player and bullets
-                    if (noEnemies != 0) { //enemy logic
-                        enemy.draw(window, deltaTime, lastPos, lastRot);
+                    if (noEnemies != 0) { //enemy logic 
+                        enemy.draw(window, deltaTime, lastEnemyPos, lastEnemyRot);
                     }
 
                     DisplayBoundaries(boundarySprites, window);//displaying boundaries
 
+                    if (appClose) {
+                        cerr << "closing game because server disconnected\n";
+                        window.close();
+                    }
+
+                    if (liveLost > totLiveLost) {
+                        cerr << "heavy SERVER_LIVE_CHECK failure, closing the application\n";
+                        window.close();
+                    }
+
                     //render
                     window.display();
                 }
+
+                isRunning = false;
+                networkThread.join();
+
             }
             else {
                 return 0;

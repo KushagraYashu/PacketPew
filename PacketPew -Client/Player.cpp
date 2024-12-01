@@ -77,9 +77,33 @@ float Player::GetMoveRate() {
 	return m_moveRate;
 }
 
-void Player::PerformMove(int directionX, int directionY) {
-	int dx = (directionX != 0) ? directionX / abs(directionX) : 0;
-	int dy = (directionY != 0) ? directionY / abs(directionY) : 0;
+float Player::GetMinX() {
+	return m_minX;
+}
+
+float Player::GetMinY() {
+	return m_minY;
+}
+
+float Player::GetMaxX() {
+	return m_maxX;
+}
+
+float Player::GetMaxY() {
+	return m_maxY;
+}
+
+void Player::Move(sf::Vector2f pos) {
+	sf::Vector2f newPos = m_playerSprite.getPosition() + pos;
+	float clampedPosX = std::clamp(newPos.x, m_minX, m_maxX);
+	float clampedPosY = std::clamp(newPos.y, m_minY, m_maxY);
+	m_playerSprite.setPosition(clampedPosX, clampedPosY);
+	m_gunSprite.setPosition(m_playerSprite.getPosition());
+}
+
+void Player::MovePredicted(sf::Vector2f  moveDir) {
+	int dx = (moveDir.x != 0) ? moveDir.x / abs(moveDir.x) : 0;
+	int dy = (moveDir.y != 0) ? moveDir.y / abs(moveDir.y) : 0;
 	float length = sqrt((dx * dx) + (dy * dy));
 	sf::Vector2f direction = sf::Vector2f(dx / length, dy / length);
 	sf::Vector2f newPos = m_playerSprite.getPosition() + sf::Vector2f(direction.x * m_moveRate, direction.y * m_moveRate);
@@ -105,17 +129,19 @@ void Player::MoveDown(bool Down) {
 	m_moveDown = Down;
 }
 
-void Player::CheckMove() {
+sf::Vector2f Player::CheckMove() {
+	sf::Vector2f playerMovDir = sf::Vector2f();
 	if (m_moveUp) {
-		PerformMove(0.f, -1.f);
+		playerMovDir += sf::Vector2f(0.f, -1.f);
 	}
 	if (m_moveDown) {
-		PerformMove(0.f, 1.f);
+		playerMovDir += sf::Vector2f(0.f, 1.f);
 	}
 	if (m_moveRight) {
-		PerformMove(1.f, 0.f);
+		playerMovDir += sf::Vector2f(1.f, 0.f);
 	}
 	if (m_moveLeft) {
-		PerformMove(-1.f, 0.f);
+		playerMovDir += sf::Vector2f(-1.f, 0.f);
 	}
+	return playerMovDir;
 }

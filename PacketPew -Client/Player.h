@@ -31,14 +31,20 @@ public:
 	float GetMoveRate(); //return a copy to move rate
 	void SetMoveRate(float moveRate); //set the move rate
 
-	void CheckMove();
+	float GetMinX();
+	float GetMaxX();
+	float GetMinY();
+	float GetMaxY();
+
+	void Move(sf::Vector2f newPos);
+	void MovePredicted(sf::Vector2f moveDir);
+	sf::Vector2f CheckMove();
 	void MoveLeft(bool left);
 	void MoveRight(bool right);
 	void MoveUp(bool up);
 	void MoveDown(bool down);
 
 private:
-	void PerformMove(int directionX, int directionY);
 
 	//player variables
 	sf::Sprite m_playerSprite;

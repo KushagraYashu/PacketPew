@@ -124,6 +124,15 @@ void BroadcastEnemies(list<sf::TcpSocket*>& clients, sf::SocketSelector& selecto
     BroadcastToAll(clients, enemiesData, selector);
 }
 
+sf::Vector2f PerformMove(sf::Vector2f moveDir, float moveRate, sf::Vector2f curPlayerPos) {
+    int dx = (moveDir.x != 0) ? moveDir.x / abs(moveDir.x) : 0;
+    int dy = (moveDir.y != 0) ? moveDir.y / abs(moveDir.y) : 0;
+    float length = sqrt((dx * dx) + (dy * dy));
+    sf::Vector2f direction = sf::Vector2f(dx / length, dy / length);
+    sf::Vector2f pos = curPlayerPos + sf::Vector2f(direction.x * moveRate, direction.y * moveRate);
+    return pos;
+}
+
 int main()
 {
     //setting project name and version
@@ -133,7 +142,7 @@ int main()
 
     //setting server variables
     int port = 6969;
-    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this in a way that you can connect to the same machines on the network
+    sf::IpAddress serverIP = sf::IpAddress("10.167.198.12"); //TODO: change this in a way that you can connect to the same machines on the network
     sf::TcpListener serverListener;
 
     //clients
@@ -157,7 +166,7 @@ int main()
 
     //clock and broadcast time
     sf::Clock broadcastClock;
-    const sf::Time broadcastTime = sf::milliseconds(50); //10 updates per second
+    const sf::Time broadcastTime = sf::milliseconds(50); //20 updates per second
 
     while (true) {
         if (selector.wait(sf::milliseconds(SELECTOR_WAIT_TIME_MS))) {
@@ -188,6 +197,20 @@ int main()
                             }
                             if (type == "SERVER_LIVE_CHECK") {
                                 //server live check
+                            }
+                            if (type == "PLAYER_ACTION_MOVE") {
+                                sf::Vector2f moveDir;
+                                msg >> moveDir;
+                                float moveRate;
+                                msg >> moveRate;
+                                sf::Vector2f curPlayerPos;
+                                msg >> curPlayerPos;
+                                sf::Vector2f playerPosNew = PerformMove(moveDir, moveRate, curPlayerPos);
+                                sf::Packet playerPosPacket;
+                                playerPosPacket << "PLAYER_POS" << playerPosNew;
+                                if (client.send(playerPosPacket) != sf::Socket::Done) {
+                                    cerr << "error in sending the calculated position";
+                                }
                             }
                             if (type == "PLAYER_POS_ROT") {
                                 if (broadcastClock.getElapsedTime() >= broadcastTime) {
