@@ -22,6 +22,7 @@ public:
 	void SetPlayerSprite(sf::Texture& playerTexture, sf::RenderWindow& window); //set texture, set origin, position to window centre
 	void SetGunSprite(sf::Texture& gunTexture); //set texture, origin, and position relative to the player
 	sf::Sprite& GetPlayerSprite(); //return a pointer to player sprite
+	sf::Sprite& GetGunSprite() { return m_gunSprite; };
 	void SetPlayerPosition(sf::Vector2f pos);
 	void UpdatePlayerRotation(sf::RenderWindow& window);
 	void Fire(sf::Texture& bulletTex);

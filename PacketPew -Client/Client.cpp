@@ -218,6 +218,7 @@ int main() {
                                 sf::Vector2f serverPlayerPos(clampedX, clampedY);
                                 if (player.GetPlayerSprite().getPosition() != serverPlayerPos) {
                                     player.GetPlayerSprite().setPosition(player.GetPlayerSprite().getPosition() + (serverPlayerPos - player.GetPlayerSprite().getPosition()) * serverResponseClock.getElapsedTime().asSeconds());
+                                    player.GetGunSprite().setPosition(player.GetPlayerSprite().getPosition());
                                     serverResponseClock.restart();
                                 }
                                 
