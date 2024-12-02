@@ -33,7 +33,7 @@ int main() {
 
     //networking things
     int port = 6969;
-    sf::IpAddress serverIP = sf::IpAddress("10.167.198.12"); //TODO: change this so you can input a string from the user to connect to the server
+    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this so you can input a string from the user to connect to the server
 
     //connect to server
     sf::Socket::Status tcpConnectStat = socket.connect(serverIP, port);
@@ -108,6 +108,15 @@ int main() {
                 //network thread
                 thread networkThread(NetworkingThread);
 
+                //player actions
+                struct PlayerActions {
+                    int sequenceNo;
+                    sf::Vector2f moveDir;
+                };
+
+                int curSequenceNo = 1;
+                vector<PlayerActions> actions;
+
                 //GAME LOOP
                 while (window.isOpen()) {
 
@@ -169,16 +178,22 @@ int main() {
                     sf::Vector2f playerMovDir = player.CheckMove();//moving
                     if (playerMovDir.x != 0 || playerMovDir.y != 0) {
                         sf::Packet playerAct;
-                        playerAct << 1 << "PLAYER_ACTION_MOVE" << playerMovDir << player.GetMoveRate() << player.GetPlayerSprite().getPosition();
+                        playerAct << 1 << "PLAYER_ACTION_MOVE" << curSequenceNo << playerMovDir << player.GetMoveRate() << player.GetPlayerSprite().getPosition();
                         {
                             lock_guard<mutex> lock(networkMutex);
                             toSend.push_back(playerAct);
                         }
                         cerr << "sending i want to move in :" << playerMovDir.x << "\t" << playerMovDir.y << endl;
-                    }
-                    //moving the player, assuming the server will respond with the same position
-                    if (playerMovDir.x != 0 || playerMovDir.y != 0)
+                        actions.push_back({ curSequenceNo, playerMovDir });
+                        if (curSequenceNo > 100000000) {
+                            curSequenceNo = 1;
+                        }
+                        curSequenceNo++;
+                        //moving the player, assuming the server will respond with the same position
                         player.MovePredicted(playerMovDir);
+                    }
+                    
+                        
 
                     //clear
                     window.clear(sf::Color::Black);
@@ -210,6 +225,8 @@ int main() {
 
                             
                             if (type == "PLAYER_POS") {
+                                int serverSequenceNo;
+                                curPacket >> serverSequenceNo;
                                 sf::Vector2f newPos;
                                 curPacket >> newPos;
                                 cerr << "receiving position as : " << newPos.x << "\t" << newPos.y << endl;
@@ -217,8 +234,21 @@ int main() {
                                 float clampedY = clamp(newPos.y, player.GetMinY(), player.GetMaxY());
                                 sf::Vector2f serverPlayerPos(clampedX, clampedY);
                                 if (player.GetPlayerSprite().getPosition() != serverPlayerPos) {
-                                    player.GetPlayerSprite().setPosition(player.GetPlayerSprite().getPosition() + (serverPlayerPos - player.GetPlayerSprite().getPosition()) * serverResponseClock.getElapsedTime().asSeconds());
+                                    player.GetPlayerSprite().setPosition(serverPlayerPos);
                                     player.GetGunSprite().setPosition(player.GetPlayerSprite().getPosition());
+                                    for (auto& action : actions) {
+                                        if (action.sequenceNo != serverSequenceNo) {
+                                            player.MovePredicted(action.moveDir);
+                                        }
+                                        else {
+                                            actions.erase(
+                                                std::remove_if(actions.begin(), actions.end(), [serverSequenceNo](const PlayerActions& action) {
+                                                    return action.sequenceNo == serverSequenceNo;
+                                                    }),
+                                                actions.end()
+                                            );
+                                        }
+                                    }
                                     serverResponseClock.restart();
                                 }
                                 

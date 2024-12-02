@@ -142,7 +142,7 @@ int main()
 
     //setting server variables
     int port = 6969;
-    sf::IpAddress serverIP = sf::IpAddress("10.167.198.12"); //TODO: change this in a way that you can connect to the same machines on the network
+    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this in a way that you can connect to the same machines on the network
     sf::TcpListener serverListener;
 
     //clients
@@ -199,6 +199,8 @@ int main()
                                 //server live check
                             }
                             if (type == "PLAYER_ACTION_MOVE") {
+                                int sequenceNo;
+                                msg >> sequenceNo;
                                 sf::Vector2f moveDir;
                                 msg >> moveDir;
                                 float moveRate;
@@ -207,7 +209,7 @@ int main()
                                 msg >> curPlayerPos;
                                 sf::Vector2f playerPosNew = PerformMove(moveDir, moveRate, curPlayerPos);
                                 sf::Packet playerPosPacket;
-                                playerPosPacket << "PLAYER_POS" << playerPosNew;
+                                playerPosPacket << "PLAYER_POS" << sequenceNo << playerPosNew;
                                 if (client.send(playerPosPacket) != sf::Socket::Done) {
                                     cerr << "error in sending the calculated position";
                                 }
