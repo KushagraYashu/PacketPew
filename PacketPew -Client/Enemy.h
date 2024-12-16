@@ -26,7 +26,8 @@ public:
 	sf::Sprite& GetEnemySprite(); //return a pointer to Enemy sprite
 	void SetEnemyPosition(sf::Vector2f pos);
 	void UpdateEnemyRotation(float angle);
-	void Fire(sf::Texture& bulletTex);
+	void Fire(sf::Texture& bulletTex, float angle);
+	sf::Vector2f MovePredicted(sf::Vector2f moveDir);
 
 	void draw(sf::RenderWindow& window, float deltaTime, sf::Vector2f position, float angle);
 

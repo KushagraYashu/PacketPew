@@ -60,8 +60,18 @@ void Enemy::UpdateEnemyRotation(float angle) {
 	m_gunSprite.setRotation(angle);
 }
 
-void Enemy::Fire(sf::Texture& bulletTex) {
+void Enemy::Fire(sf::Texture& bulletTex, float angle) {
+	UpdateEnemyRotation(angle);
 	CreateBullet(m_bullets, bulletTex, m_enemySprite.getPosition(), m_enemySprite.getRotation(), m_bulletSpeed);
+}
+
+sf::Vector2f Enemy::MovePredicted(sf::Vector2f  moveDir) {
+	int dx = (moveDir.x != 0) ? moveDir.x / abs(moveDir.x) : 0;
+	int dy = (moveDir.y != 0) ? moveDir.y / abs(moveDir.y) : 0;
+	float length = sqrt((dx * dx) + (dy * dy));
+	sf::Vector2f direction = sf::Vector2f((length !=0) ? dx / length : 0, (length != 0) ? dy / length : 0);
+	sf::Vector2f newPos = sf::Vector2f(direction.x * m_moveRate, direction.y * m_moveRate);
+	return newPos;
 }
 
 void Enemy::draw(sf::RenderWindow& window, float deltaTime, sf::Vector2f position, float angle) {
