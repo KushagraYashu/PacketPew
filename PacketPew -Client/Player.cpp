@@ -58,13 +58,13 @@ void Player::UpdatePlayerRotation(sf::RenderWindow& window) {
 }
 
 void Player::Fire(sf::Texture& bulletTex) {
-	CreateBullet(m_bullets, bulletTex, m_playerSprite.getPosition(), m_playerSprite.getRotation(), m_bulletSpeed);
+	CreateBullet(m_bullets, bulletTex, m_playerSprite.getPosition(), m_id,  m_playerSprite.getRotation(), m_bulletSpeed);
 }
 
-void Player::draw(sf::RenderWindow& window, float deltaTime) {
+void Player::draw(sf::RenderWindow& window, float deltaTime, Player& instance, Enemy& enemy) {
 	UpdatePlayerRotation(window);
 	window.draw(m_playerSprite);
-	UpdateBullets(m_bullets, deltaTime);
+	UpdateBullets(m_bullets, deltaTime, true, &instance, &enemy);
 	RenderBullets(m_bullets, window);
 	window.draw(m_gunSprite);
 }
@@ -91,6 +91,14 @@ float Player::GetMaxX() {
 
 float Player::GetMaxY() {
 	return m_maxY;
+}
+
+float Player::GetHealth() {
+	return m_health;
+}
+
+void Player::TakeDamage(float damage) {
+	m_health -= damage;
 }
 
 void Player::Move(sf::Vector2f pos) {

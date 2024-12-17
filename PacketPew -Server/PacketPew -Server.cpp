@@ -20,12 +20,14 @@ const int SCREEN_HEIGHT = 720;
 
 struct ClientData {
     sf::TcpSocket* socket;
-    int index;
+    unsigned sequenceNo;
     sf::Vector2f position;
+    sf::Sprite playerSprite;
     float rotation;
-    bool isFiring;
+    string id;
 };
-list<ClientData> clientDataList;
+ClientData clientDataArray[2];
+int index = 0;
 
 struct ClientInputs {
     sf::TcpSocket* socket;
@@ -38,6 +40,17 @@ struct ClientInputs {
     float rot;
 };
 list<ClientInputs> clientInputsList;
+
+struct Bullet {
+public:
+    sf::Sprite bulletSprite;
+    sf::Vector2f pos;
+    std::string id;
+    sf::Vector2f m_velocity;
+    float m_speed;
+    float m_lifetime;
+};
+vector<Bullet> bullets;
 
 void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::TcpSocket& except, sf::Packet& sendPacket, sf::SocketSelector& selector);
 void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::Packet& sendPacket, sf::SocketSelector& selector);
@@ -132,6 +145,9 @@ void AddClients(sf::TcpListener& serverListener, list<sf::TcpSocket*>& clients, 
             if (client->send(welcomePacket) == sf::Socket::Done) {
                 printf("A client connected at port %d and address %s\n", client->getRemotePort(), client->getRemoteAddress().toString().data());
                 clients.push_back(client);
+                clientDataArray[index % 2].socket = client;
+                clientDataArray[index % 2].id = "player" + to_string((index % 2) + 1);
+                index++;
                 std::cout << "Total clients connected " << clients.size() << std::endl;
                 selector.add(*client);
             }
@@ -167,12 +183,75 @@ sf::Vector2f PerformMove(sf::Vector2f moveDir, float moveRate, sf::Vector2f curP
     return sf::Vector2f(clampedPosX, clampedPosY);
 }
 
+void CreateBullet(std::vector<Bullet>& bullets, sf::Texture bulletTex, sf::Vector2f spawnPos, std::string id, float spawnRot, float speed, float lifetime) {
+    Bullet bullet;
+    bullet.bulletSprite.setTexture(bulletTex);
+    bullet.bulletSprite.setOrigin(bullet.bulletSprite.getLocalBounds().width / 2, bullet.bulletSprite.getLocalBounds().height / 2);
+    bullet.bulletSprite.setPosition(spawnPos);
+    bullet.m_speed = speed;
+    bullet.id = id;
+    bullet.pos = spawnPos;
+    float angleRad = spawnRot * 3.14159f / 180.f;
+    bullet.m_velocity = sf::Vector2f(std::cos(angleRad) * bullet.m_speed, std::sin(angleRad) * bullet.m_speed);
+    bullet.m_lifetime = lifetime;
+    bullets.push_back(bullet);
+}
+
+void CheckCollision(std::list<sf::TcpSocket*> clients, sf::SocketSelector selector) {
+    bool hit = false;
+    for (auto it = bullets.begin(); it != bullets.end();) {
+        sf::FloatRect bulletBounds = it->bulletSprite.getGlobalBounds();
+        for (auto& client : clientDataArray) {
+            if (client.position != sf::Vector2f() && bulletBounds.intersects(client.playerSprite.getGlobalBounds()) && it->id != client.id) {
+                cout << it->id << " bullet hit " << client.id << endl;
+                hit = true;
+                sf::Packet hitPacket;
+                hitPacket << "BULLET_HIT" << it->id << client.id;
+                it = bullets.erase(it);
+                BroadcastToAll(clients, hitPacket, selector);
+                break;
+            }
+        }
+        if (hit) {
+            hit = false;
+            continue;
+        }
+        else {
+            it++;
+        }
+    }
+}
+
+void UpdateBullets(std::list<sf::TcpSocket*> clients, sf::SocketSelector selector, float deltaTime) {
+    CheckCollision(clients, selector);
+    for (auto it = bullets.begin(); it != bullets.end();) {
+        it->bulletSprite.move(it->m_velocity * deltaTime);
+        it->pos = it->bulletSprite.getPosition();
+        it->m_lifetime -= deltaTime;
+        if (it->m_lifetime <= 0) {
+            it = bullets.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
 int main()
 {
     //setting project name and version
     string versionNo = "1.0";
     string projectFullName = "PacketPew Server ";
     projectFullName.append(versionNo);
+
+    //setting textures
+    sf::Texture playerTex, bulletTex;
+    playerTex.loadFromFile("Textures/checkerboardPlayer.png");
+    bulletTex.loadFromFile("Textures/bullet.png");
+    clientDataArray[0].playerSprite.setTexture(playerTex);
+    clientDataArray[0].playerSprite.setOrigin(clientDataArray[0].playerSprite.getLocalBounds().width / 2, clientDataArray[0].playerSprite.getLocalBounds().height / 2);
+    clientDataArray[1].playerSprite.setTexture(playerTex);
+    clientDataArray[1].playerSprite.setOrigin(clientDataArray[1].playerSprite.getLocalBounds().width / 2, clientDataArray[1].playerSprite.getLocalBounds().height / 2);
 
     //setting server variables
     int port = 6969;
@@ -201,6 +280,7 @@ int main()
     //clock and broadcast time
     sf::Clock broadcastClock;
     sf::Clock serverClock;
+    sf::Clock bulletClock;
     const sf::Time broadcastTime = sf::milliseconds(50); //20 updates per second
 
     while (true) {
@@ -212,6 +292,8 @@ int main()
                 serverClock.restart();
             }
             else {
+                float deltaTime = bulletClock.restart().asSeconds();
+                UpdateBullets(clients, selector, deltaTime);
                 list<sf::TcpSocket*> clientsCopy = clients;
                 for (std::list<sf::TcpSocket*>::iterator it = clientsCopy.begin(); it != clientsCopy.end(); ++it) {
                     sf::TcpSocket& client = **it;
@@ -249,6 +331,12 @@ int main()
                                 msg >> max;
                                 float playerRot;
                                 msg >> playerRot;
+                                for (auto& clientData : clientDataArray) {
+                                    if (&client == clientData.socket) {
+                                        clientData.position = curPlayerPos;
+                                        clientData.playerSprite.setPosition(curPlayerPos);
+                                    }
+                                }
                                 clientInputsList.push_back({ &client, sequenceNo, moveDir, moveRate, curPlayerPos, sf::Vector2f(), min, max, playerRot });
                                 /*sf::Vector2f playerPosNew = PerformMove(moveDir, moveRate, curPlayerPos, min, max);
                                 sf::Packet playerPosPacket;
@@ -260,7 +348,7 @@ int main()
                                 enemyDataPacket << "ENEMY_POS_ROT" << playerPosNew << playerRot;
                                 BroadcastToAll(clients, client, enemyDataPacket, selector);*/
                             }
-                            if (type == "PLAYER_POS_ROT") {
+                            /*if (type == "PLAYER_POS_ROT") {
                                 if (broadcastClock.getElapsedTime() >= broadcastTime) {
                                     ClientData clientData;
                                     msg >> clientData.position;
@@ -274,11 +362,29 @@ int main()
                                     BroadcastToAll(clients, client, enemyPos, selector);
                                     broadcastClock.restart();
                                 }
-                            }
+                            }*/
                             if (type == "PLAYER_FIRE") {
-                                sf::Packet enemyFire;
+                                sf::Vector2f pos;
                                 float playerRot;
+                                string id;
+                                float speed;
+                                float lifetime;
+                                msg >> pos;
                                 msg >> playerRot;
+                                msg >> id;
+                                msg >> speed;
+                                msg >> lifetime;
+                                for (auto& clientData : clientDataArray) {
+                                    if (&client == clientData.socket) {
+                                        clientData.id = id;
+                                        clientData.position = pos;
+                                        clientData.playerSprite.setPosition(pos);
+                                        clientData.rotation = playerRot;
+                                        clientData.playerSprite.setRotation(playerRot);
+                                    }
+                                }
+                                CreateBullet(bullets, bulletTex, pos, id, playerRot, speed, lifetime);
+                                sf::Packet enemyFire;
                                 enemyFire << "ENEMY_FIRE" << playerRot;
                                 BroadcastToAll(clients, client, enemyFire, selector);
                             }
@@ -290,7 +396,20 @@ int main()
                     if (!clientInputsList.empty()) {
                         for (auto &input : clientInputsList) {
                             input.newPos = PerformMove(input.moveDir, input.moveRate, input.curPos, input.min, input.max);
+                            for (auto& client : clientDataArray) {
+                                if (input.socket == client.socket) {
+                                    if (input.sequenceNo > client.sequenceNo) {
+                                        client.position = input.newPos;
+                                        client.playerSprite.setPosition(input.newPos);
+                                        client.rotation = input.rot;
+                                        client.playerSprite.setRotation(input.rot);
+                                        client.rotation = input.rot;
+                                        client.sequenceNo = input.sequenceNo;
+                                    }
+                                }
+                            }
                         }
+                        
                         sf::Packet playerPosPacket;
                         sf::TcpSocket& client = *clientInputsList.back().socket;
                         playerPosPacket << "PLAYER_POS" << clientInputsList.back().sequenceNo << clientInputsList.back().newPos;
@@ -310,8 +429,10 @@ int main()
                     }
                     broadcastClock.restart();
                 }
+                
             }
         }
+        
     }
 
     return 0;

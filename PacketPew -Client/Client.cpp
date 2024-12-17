@@ -23,7 +23,7 @@ const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
 
 //function declarations
-void Quit();
+void Quit(string msg, string name);
 void Won(string msg, string name);
 int MainGame(string msg, string projectFullName);
 
@@ -41,59 +41,87 @@ int main() {
     int port = 6969;
     sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this so you can input a string from the user to connect to the server
 
-    //connect to server
-    sf::Socket::Status tcpConnectStat = socket.connect(serverIP, port);
-    if (tcpConnectStat != sf::Socket::Done) {
-        cerr << "couldnt connect to the server at " << serverIP.toString();
-    }
-    else {
+    bool restartGame = false;
+
+    do {
+        restartGame = false; // Reset restart flag
+
+        // Attempt to connect to the server
+        sf::Socket::Status tcpConnectStat = socket.connect(serverIP, port);
+        if (tcpConnectStat != sf::Socket::Done) {
+            cerr << "Couldn't connect to the server at " << serverIP.toString() << endl;
+            break; // Exit if connection fails
+        }
+
         sf::Packet welcomePacket;
         if (socket.receive(welcomePacket) != sf::Socket::Done) {
-            cerr << "something's wrong with welcome msg";
-            return -1;
+            cerr << "Something's wrong with the welcome message" << endl;
+            break; // Exit if welcome packet fails
         }
+
         string msg;
         welcomePacket >> msg;
         if (msg == "-1") {
-            cerr << "Server cant accommodate you right now, sorry\n";
-            return 0;
+            cerr << "Server can't accommodate you right now, sorry\n";
+            break;
         }
-        else {
-            cout << "Welcome to \"Packet Pew\"\nPress \"Y\" for playing: ";
-            char accept;
+
+        cout << "Welcome to \"Packet Pew\"\nPress \"Y\" to play: ";
+        char accept;
+        cin >> accept;
+
+        if (accept == 'Y' || accept == 'y') {
+            isRunning = true;
+            if (MainGame(msg, projectFullName) != 0) {
+                cerr << "Some error in main game loop\n";
+            }
+
+            // Ask for restart after the game ends
+            cout << "Do you want to play again? Y/N: ";
             cin >> accept;
             if (accept == 'Y' || accept == 'y') {
-                if (MainGame(msg, projectFullName) != 0) {
-                    cerr << "some error in main game loop";
-                }
+                restartGame = true; // Restart the game
+                socket.disconnect(); // Disconnect before restarting
+                socket.setBlocking(true);
+            }
+            else {
+                restartGame = false;
             }
         }
+    } while (restartGame);
 
-    }
-
-	return 0;
+    cout << "Exiting game. Goodbye!\n";
+    return 0;
 }
 
-void Quit() {
-    cout << "You Quit, game lost\n";
+void Quit(string msg, string name) {
+    isRunning = false;
+    socket.setBlocking(true);
+    socket.disconnect();
+    cout << "You Quit. Game lost.\n";
+    cout << "Returning to main menu...\n";
+    // Let the main loop handle the next steps
+}
+
+void Lost(string msg, string name) {
+    isRunning = false;
+    socket.setBlocking(true);
+    socket.disconnect();
+    cout << "You Died! You Lost!\n";
+    cout << "Returning to main menu...\n";
 }
 
 void Won(string msg, string name) {
-    cout << "Enemy forfeited, you won!\n";
-    cout << "Wanna try again? Y/N: ";
-    char accept;
-    cin >> accept;
-    if (accept == 'Y' || accept == 'y') {
-        MainGame(msg, name);
-    }
-    else {
-        return;
-    }
+    isRunning = false;
+    socket.setBlocking(true);
+    socket.disconnect();
+    cout << "Enemy forfeited. You Won!\n";
+    cout << "Returning to main menu...\n";
 }
 
 int MainGame(string msg, string projectFullName) {
     
-        sf::Text clockText, helperText;
+        sf::Text clockText, helperText, playerHealth, enemyHealth;
         sf::Font dotoFont, robotoFont;
         if (!dotoFont.loadFromFile("Fonts/Doto/Doto-Bold.ttf")) {
             std::cerr << "Error loading font file" << std::endl;
@@ -168,6 +196,20 @@ int MainGame(string msg, string projectFullName) {
         clockText.setOutlineColor(sf::Color::White);
         clockText.setOutlineThickness(1);
         clockText.setStyle(sf::Text::Italic | sf::Text::Bold);
+        playerHealth.setPosition(window.getSize().x - 230, 10);
+        playerHealth.setFont(robotoFont);
+        playerHealth.setCharacterSize(24);
+        playerHealth.setFillColor(sf::Color::Blue);
+        playerHealth.setOutlineColor(sf::Color::White);
+        playerHealth.setOutlineThickness(2);
+        playerHealth.setStyle(sf::Text::Bold);
+        enemyHealth.setPosition(window.getSize().x - 230, window.getSize().y - 30);
+        enemyHealth.setFont(robotoFont);
+        enemyHealth.setCharacterSize(24);
+        enemyHealth.setFillColor(sf::Color::Red);
+        enemyHealth.setOutlineColor(sf::Color::White);
+        enemyHealth.setOutlineThickness(2);
+        enemyHealth.setStyle(sf::Text::Bold);
 
         //network thread
         thread networkThread(NetworkingThread);
@@ -182,6 +224,8 @@ int MainGame(string msg, string projectFullName) {
         vector<PlayerActions> actions;
 
         bool enemyFire = false;
+
+        bool playerIdSet = false;
 
         //GAME LOOP
         while (window.isOpen()) {
@@ -224,7 +268,7 @@ int MainGame(string msg, string projectFullName) {
                     }
                     if (event.key.scancode == sf::Keyboard::Scan::Q) {
                         window.close();
-                        Quit();
+                        Quit(msg, projectFullName);
                     }
                     break;
 
@@ -234,7 +278,7 @@ int MainGame(string msg, string projectFullName) {
                         player.Fire(bulletTex.getTex());//Firing
                         //adding firing packet to the vector
                         sf::Packet playerFire;
-                        playerFire << 1 << "PLAYER_FIRE" << player.GetPlayerSprite().getRotation();
+                        playerFire << 1 << "PLAYER_FIRE" << player.GetPlayerSprite().getPosition() << player.GetPlayerSprite().getRotation() << player.m_id << player.m_bulletSpeed << 5.f;
                         {
                             lock_guard<mutex> lock(networkMutex);
                             toSend.push_back(playerFire);
@@ -327,8 +371,6 @@ int MainGame(string msg, string projectFullName) {
                         cout << "Rot: " << enemyRot << endl;
                         if (lastEnemyPos != enemyPos) {
                             lastEnemyPos = enemyPos;
-                            /*predictedPos += (lastEnemyPos - predictedPos) * deltaTime;*/
-
                         }
                         else {
                             enemyMoveDir = sf::Vector2f();
@@ -337,6 +379,20 @@ int MainGame(string msg, string projectFullName) {
                             lastEnemyRot = enemyRot;
                         }
 
+                    }
+
+                    if (type == "BULLET_HIT") {
+                        string bulletId, objId;
+                        curPacket >> bulletId;
+                        curPacket >> objId;
+                        if (objId == player.m_id) {
+                            cout << "you are shot\n";
+                            player.TakeDamage(BULLET_DAMAGE);
+                        }
+                        else {
+                            cout << "enemy is shot\n";
+                            enemy.TakeDamage(BULLET_DAMAGE);
+                        }
                     }
 
                     if (type == "ENEMY_FIRE") {
@@ -354,6 +410,11 @@ int MainGame(string msg, string projectFullName) {
                         noEnemies = no;
                         enemy.SetAll(playerTex.getTex(), gunTex.getTex(), moveRate, window);
                         curPacket >> enemyRot;
+                        //lastEnemyRot = enemyRot;
+                        if (!playerIdSet) {
+                            player.m_id.append(to_string(no + 1));
+                            playerIdSet = true;
+                        }
                         if (stoi(msg) % 2 != 0) {
                             enemyPos = sf::Vector2f(SCREEN_WIDTH * 0.3f * (noEnemies + 1), SCREEN_HEIGHT * 0.5f);
                             lastEnemyPos = enemyPos;
@@ -377,7 +438,7 @@ int MainGame(string msg, string projectFullName) {
             }
             //draw
             clockText.setString(to_string(static_cast<int>(gameClock.getElapsedTime().asSeconds())));
-            player.draw(window, deltaTime); //player and bullets
+            player.draw(window, deltaTime, player, enemy); //player and bullets
             if (noEnemies > 0) { //enemy logic 
                 if (enemyFire) {
                     enemy.Fire(bulletTex.getTex(), lastEnemyRot);
@@ -386,7 +447,7 @@ int MainGame(string msg, string projectFullName) {
                 predictedPos += enemy.MovePredicted(enemyMoveDir);
 
                 predictedPos += (lastEnemyPos - predictedPos) * (deltaTime * 4);
-                enemy.draw(window, deltaTime, predictedPos, lastEnemyRot);
+                enemy.draw(window, deltaTime, predictedPos, lastEnemyRot, false);
             }
             else if (noEnemies == -1) {
                 window.close();
@@ -408,12 +469,37 @@ int MainGame(string msg, string projectFullName) {
             }
             window.draw(clockText);
             window.draw(helperText);
+            playerHealth.setString("Player Health: " + to_string(static_cast<int>(player.GetHealth())));
+            if (noEnemies > 0) {
+                enemyHealth.setString("Enemy Health: " + to_string(static_cast<int>(enemy.GetHealth())));
+            }
+            window.draw(playerHealth);
+            window.draw(enemyHealth);
+
+            if (player.GetHealth() <=0) {
+                window.close();
+                Lost(msg, projectFullName);
+            }
+
+            if (enemy.GetHealth() <= 0) {
+                window.close();
+                Won(msg, projectFullName);
+            }
 
             //render
             window.display();
         }
 
         isRunning = false;
-        networkThread.join();
+        
+        if (networkThread.joinable()) {
+            networkThread.join();
+        }
+        actions.clear();
+        {
+            lock_guard<mutex> lock(networkMutex);
+            toSend.clear();
+        }
+        
         return 0;
 }

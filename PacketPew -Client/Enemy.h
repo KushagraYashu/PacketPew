@@ -29,10 +29,16 @@ public:
 	void Fire(sf::Texture& bulletTex, float angle);
 	sf::Vector2f MovePredicted(sf::Vector2f moveDir);
 
-	void draw(sf::RenderWindow& window, float deltaTime, sf::Vector2f position, float angle);
+	void draw(sf::RenderWindow& window, float deltaTime, sf::Vector2f position, float angle, bool check);
+
+	void TakeDamage(float damage);
+	float GetHealth();
 
 	float GetMoveRate(); //return a copy to move rate
 	void SetMoveRate(float moveRate); //set the move rate
+
+public:
+	std::string m_id = "enemy";
 
 private:
 
@@ -42,6 +48,7 @@ private:
 	sf::Vector2f m_gunOffset;
 	std::vector<Bullet> m_bullets;
 	float m_bulletSpeed = 300.f;
+	float m_health = 100.f;
 
 	//move variables
 	float m_moveRate;

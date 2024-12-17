@@ -6,6 +6,7 @@
 
 //custom headers
 #include "Bullet.h"
+#include "Enemy.h"
 
 //cpp headers
 #include<iostream>
@@ -27,7 +28,7 @@ public:
 	void UpdatePlayerRotation(sf::RenderWindow& window);
 	void Fire(sf::Texture& bulletTex);
 
-	void draw(sf::RenderWindow& window, float deltaTime);
+	void draw(sf::RenderWindow& window, float deltaTime, Player& instance, Enemy& enemy);
 
 	float GetMoveRate(); //return a copy to move rate
 	void SetMoveRate(float moveRate); //set the move rate
@@ -37,6 +38,9 @@ public:
 	float GetMinY();
 	float GetMaxY();
 
+	float GetHealth();
+	void TakeDamage(float damage);
+
 	void Move(sf::Vector2f newPos);
 	void MovePredicted(sf::Vector2f moveDir);
 	sf::Vector2f CheckMove();
@@ -45,6 +49,9 @@ public:
 	void MoveUp(bool up);
 	void MoveDown(bool down);
 
+public:
+	std::string m_id = "player";
+
 private:
 
 	//player variables
@@ -52,9 +59,13 @@ private:
 	sf::Sprite m_gunSprite;
 	sf::Vector2f m_gunOffset;
 	std::vector<Bullet> m_bullets;
+
+public : 
 	float m_bulletSpeed = 300.f;
 
+private: 
 	//move variables
+	float m_health = 100.f;
 	float m_moveRate;
 	float m_minX = 29.f; 
 	float m_minY = 29.f; 
