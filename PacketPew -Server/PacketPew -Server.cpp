@@ -254,9 +254,19 @@ int main()
     clientDataArray[1].playerSprite.setOrigin(clientDataArray[1].playerSprite.getLocalBounds().width / 2, clientDataArray[1].playerSprite.getLocalBounds().height / 2);
 
     //setting server variables
-    int port = 6969;
+    int port = 54000;
     sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this in a way that you can connect to the same machines on the network
     sf::TcpListener serverListener;
+
+    char choice;
+    cout << "Do you want to use localhost (127.0.0.1)? Y/N: ";
+    cin >> choice;
+    if (choice != 'Y' && choice != 'y') {
+        cout << "Enter the ip you want to assign as server: ";
+        string ip;
+        cin >> ip;
+        serverIP = sf::IpAddress(ip);
+    }
 
     //clients
     std::list<sf::TcpSocket*> clients;

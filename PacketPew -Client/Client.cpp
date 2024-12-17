@@ -23,8 +23,10 @@ const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
 
 //function declarations
-void Quit(string msg, string name);
-void Won(string msg, string name);
+void Quit();
+void Lost();
+void WonForfeit();
+void WonKill();
 int MainGame(string msg, string projectFullName);
 
 int main() {
@@ -38,8 +40,18 @@ int main() {
     projectFullName.append(versionNo);
 
     //networking things
-    int port = 6969;
-    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this so you can input a string from the user to connect to the server
+    int port = 54000;
+    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1");
+
+    char choice;
+    cout << "Do you want to use localhost (127.0.0.1)? Y/N: ";
+    cin >> choice;
+    if (choice != 'Y' && choice != 'y') {
+        cout << "Enter the server ip: ";
+        string ip;
+        cin >> ip;
+        serverIP = sf::IpAddress(ip);
+    }
 
     bool restartGame = false;
 
@@ -94,7 +106,7 @@ int main() {
     return 0;
 }
 
-void Quit(string msg, string name) {
+void Quit() {
     isRunning = false;
     socket.setBlocking(true);
     socket.disconnect();
@@ -103,7 +115,7 @@ void Quit(string msg, string name) {
     // Let the main loop handle the next steps
 }
 
-void Lost(string msg, string name) {
+void Lost() {
     isRunning = false;
     socket.setBlocking(true);
     socket.disconnect();
@@ -111,11 +123,19 @@ void Lost(string msg, string name) {
     cout << "Returning to main menu...\n";
 }
 
-void Won(string msg, string name) {
+void WonForfeit() {
     isRunning = false;
     socket.setBlocking(true);
     socket.disconnect();
     cout << "Enemy forfeited. You Won!\n";
+    cout << "Returning to main menu...\n";
+}
+
+void WonKill() {
+    isRunning = false;
+    socket.setBlocking(true);
+    socket.disconnect();
+    cout << "You killed the enemy. You Won!\n";
     cout << "Returning to main menu...\n";
 }
 
@@ -268,7 +288,7 @@ int MainGame(string msg, string projectFullName) {
                     }
                     if (event.key.scancode == sf::Keyboard::Scan::Q) {
                         window.close();
-                        Quit(msg, projectFullName);
+                        Quit();
                     }
                     break;
 
@@ -453,7 +473,7 @@ int MainGame(string msg, string projectFullName) {
                 window.close();
                 /*isRunning = false;
                 networkThread.join();*/
-                Won(msg, projectFullName);
+                WonForfeit();
             }
 
             DisplayBoundaries(boundarySprites, window);//displaying boundaries
@@ -478,12 +498,12 @@ int MainGame(string msg, string projectFullName) {
 
             if (player.GetHealth() <=0) {
                 window.close();
-                Lost(msg, projectFullName);
+                Lost();
             }
 
             if (enemy.GetHealth() <= 0) {
                 window.close();
-                Won(msg, projectFullName);
+                WonKill();
             }
 
             //render
