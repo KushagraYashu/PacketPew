@@ -4,76 +4,129 @@
 
 #pragma once
 
-//custom headers
+// Custom headers
 #include "Bullet.h"
-#include "Enemy.h"
 
-//cpp headers
-#include<iostream>
+// Standard C++ headers
+#include <iostream>
 
-//sfml headers
-#include<SFML/Network.hpp>
-#include<SFML/Graphics.hpp>
+// SFML headers
+#include <SFML/Network.hpp>
+#include <SFML/Graphics.hpp>
 
 class Player {
-public: 
-	Player(); //default constructor
-	Player(sf::Texture& playerTexture, sf::Texture& gunTex, float moveRate, sf::RenderWindow& window); //set the whole player
-	
-	void SetPlayerSprite(sf::Texture& playerTexture, sf::RenderWindow& window); //set texture, set origin, position to window centre
-	void SetGunSprite(sf::Texture& gunTexture); //set texture, origin, and position relative to the player
-	sf::Sprite& GetPlayerSprite(); //return a pointer to player sprite
-	sf::Sprite& GetGunSprite() { return m_gunSprite; };
-	void SetPlayerPosition(sf::Vector2f pos);
-	void UpdatePlayerRotation(sf::RenderWindow& window);
-	void Fire(sf::Texture& bulletTex);
+public:
+    Player();
+    // Default constructor
 
-	void draw(sf::RenderWindow& window, float deltaTime, Player& instance, Enemy& enemy);
+    Player(sf::Texture& playerTexture, sf::Texture& gunTex, float moveRate, sf::RenderWindow& window);
+    // Parameterized constructor to initialize player and gun sprites, and movement rate
 
-	float GetMoveRate(); //return a copy to move rate
-	void SetMoveRate(float moveRate); //set the move rate
+    void SetPlayerSprite(sf::Texture& playerTexture, sf::RenderWindow& window);
+    // Sets up the player sprite: texture, origin, and initial position at the center of the window
 
-	float GetMinX();
-	float GetMaxX();
-	float GetMinY();
-	float GetMaxY();
+    void SetGunSprite(sf::Texture& gunTexture);
+    // Sets up the gun sprite: texture, origin, and position relative to the player
 
-	float GetHealth();
-	void TakeDamage(float damage);
+    sf::Sprite& GetPlayerSprite();
+    // Returns a reference to the player sprite
 
-	void Move(sf::Vector2f newPos);
-	void MovePredicted(sf::Vector2f moveDir);
-	sf::Vector2f CheckMove();
-	void MoveLeft(bool left);
-	void MoveRight(bool right);
-	void MoveUp(bool up);
-	void MoveDown(bool down);
+    sf::Sprite& GetGunSprite() { return m_gunSprite; }
+    // Returns a reference to the gun sprite
+
+    void SetPlayerPosition(sf::Vector2f pos);
+    // Sets the player's position and aligns the gun position accordingly
+
+    void UpdatePlayerRotation(sf::RenderWindow& window);
+    // Updates the rotation of the player and gun based on mouse position
+
+    void Fire(sf::Texture& bulletTex);
+    // Fires a bullet from the player's position and rotation
+
+    void draw(sf::RenderWindow& window, float deltaTime);
+    // Draws the player, gun, and bullets to the window
+
+    float GetMoveRate();
+    // Returns the player's movement rate
+
+    void SetMoveRate(float moveRate);
+    // Sets the player's movement rate
+
+    float GetMinX();
+    // Returns the minimum X boundary
+
+    float GetMaxX();
+    // Returns the maximum X boundary
+
+    float GetMinY();
+    // Returns the minimum Y boundary
+
+    float GetMaxY();
+    // Returns the maximum Y boundary
+
+    float GetHealth();
+    // Returns the player's current health
+
+    void TakeDamage(float damage);
+    // Reduces the player's health by the given damage value
+
+    void Move(sf::Vector2f newPos);
+    // Moves the player to a new position, clamping it within defined boundaries
+
+    void MovePredicted(sf::Vector2f moveDir);
+    // Predicts the player's movement in a specific direction and updates the position
+
+    sf::Vector2f CheckMove();
+    // Returns the player's movement direction based on input states
+
+    void MoveLeft(bool left);
+    // Sets the left movement flag
+
+    void MoveRight(bool right);
+    // Sets the right movement flag
+
+    void MoveUp(bool up);
+    // Sets the up movement flag
+
+    void MoveDown(bool down);
+    // Sets the down movement flag
 
 public:
-	std::string m_id = "player";
+    std::string m_id = "player";
+    // Player ID string for identification
+
+    float m_bulletSpeed = 300.f;
+    // Bullet speed
 
 private:
+    // Player variables
+    sf::Sprite m_playerSprite;
+    // Sprite representing the player
 
-	//player variables
-	sf::Sprite m_playerSprite;
-	sf::Sprite m_gunSprite;
-	sf::Vector2f m_gunOffset;
-	std::vector<Bullet> m_bullets;
+    sf::Sprite m_gunSprite;
+    // Sprite representing the player's gun
 
-public : 
-	float m_bulletSpeed = 300.f;
+    sf::Vector2f m_gunOffset;
+    // Offset for gun position relative to the player
 
-private: 
-	//move variables
-	float m_health = 100.f;
-	float m_moveRate;
-	float m_minX = 29.f; 
-	float m_minY = 29.f; 
-	float m_maxX; 
-	float m_maxY;
-	bool m_moveLeft = false;
-	bool m_moveRight = false;
-	bool m_moveUp = false;
-	bool m_moveDown = false;
+    std::vector<Bullet> m_bullets;
+    // Vector storing bullets fired by the player
 
+    float m_health = 100.f;
+    // Player's health
+
+    float m_moveRate;
+    // Player's movement rate
+
+    // Movement boundaries
+    float m_minX = 29.f;
+    float m_minY = 29.f;
+    float m_maxX;
+    float m_maxY;
+
+    // Movement flags
+    bool m_moveLeft = false;
+    bool m_moveRight = false;
+    bool m_moveUp = false;
+    bool m_moveDown = false;
 };

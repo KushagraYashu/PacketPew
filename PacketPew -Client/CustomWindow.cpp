@@ -1,38 +1,56 @@
-//author: Kushagra
+// author: Kushagra
 
 #pragma once
 
-//cpp headers
+// Standard C++ headers
 #include <iostream>
 
-//sfml headers
-#include<SFML/Network.hpp>
-#include<SFML/Graphics.hpp>
+// SFML headers
+#include <SFML/Network.hpp>
+#include <SFML/Graphics.hpp>
 #include <SFML/Window/Window.hpp>
 
-static void CreateGameWindow(sf::RenderWindow& window, sf::VideoMode mode = sf::VideoMode(1280, 720), const sf::String& title = "", sf::Uint32 style = sf::Style::Default, const sf::ContextSettings& settings = sf::ContextSettings(), bool vsync = false, int antialiasingLevel = 0, sf::Image icon = sf::Image()) //create a window with defined size, title, style, settings, v-sync, anti-aliasing level, and an icon
-{
-	sf::ContextSettings newSet = settings;
-	newSet.antialiasingLevel = antialiasingLevel;
+// Creates a game window with specified parameters.
 
-	window.create(mode, title, style, settings);
-	window.setVerticalSyncEnabled(vsync);
+static void CreateGameWindow(
+    sf::RenderWindow& window,
+    sf::VideoMode mode = sf::VideoMode(1280, 720),
+    const sf::String& title = "",
+    sf::Uint32 style = sf::Style::Default,
+    const sf::ContextSettings& settings = sf::ContextSettings(),
+    bool vsync = false,
+    int antialiasingLevel = 0,
+    sf::Image icon = sf::Image()
+) {
+    sf::ContextSettings newSettings = settings;
+    newSettings.antialiasingLevel = antialiasingLevel;
 
-	window.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
+    window.create(mode, title, style, newSettings);
+    window.setVerticalSyncEnabled(vsync);
+
+    if (!icon.getSize().x || !icon.getSize().y) return; // Ensure icon has valid size
+    window.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
 }
 
-static void CreateGameWindow(sf::RenderWindow& window, const sf::String& title = "", bool vsync = false, int maxFrameRate = 60, int antialiasingLevel = 0, sf::Image icon = sf::Image()) //create a window with defined title, v-sync, max fps, anti-aliasing level, and an icon
-{
-	sf::VideoMode mode = sf::VideoMode(1280, 720);
-	sf::Uint32 style = sf::Style::Default;
-	sf::ContextSettings settings = sf::ContextSettings();
+// Overloaded version to create a game window with simplified parameters.
+static void CreateGameWindow(
+    sf::RenderWindow& window,
+    const sf::String& title = "",
+    bool vsync = false,
+    int maxFrameRate = 60,
+    int antialiasingLevel = 0,
+    sf::Image icon = sf::Image()
+) {
+    sf::VideoMode mode = sf::VideoMode(1280, 720);
+    sf::Uint32 style = sf::Style::Default;
+    sf::ContextSettings settings;
 
-	sf::ContextSettings newSet = settings;
-	newSet.antialiasingLevel = antialiasingLevel;
+    settings.antialiasingLevel = antialiasingLevel;
 
-	window.create(mode, title, style, settings);
-	window.setVerticalSyncEnabled(vsync);
-	window.setFramerateLimit(maxFrameRate);
+    window.create(mode, title, style, settings);
+    window.setVerticalSyncEnabled(vsync);
+    window.setFramerateLimit(maxFrameRate);
 
-	window.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
+    if (!icon.getSize().x || !icon.getSize().y) return; // Ensure icon has valid size
+    window.setIcon(icon.getSize().x, icon.getSize().y, icon.getPixelsPtr());
 }

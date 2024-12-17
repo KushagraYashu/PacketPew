@@ -1,34 +1,34 @@
-//author: Kushagra
+// Author: Kushagra
 
-//Bullet header file
+// Bullet header file
 
 #pragma once
 
-//cpp headers
-#include<iostream>
+// Standard C++ headers
+#include <iostream>
 
-//sfml headers
-#include<SFML/Network.hpp>
-#include<SFML/Graphics.hpp>
+// SFML headers
+#include <SFML/Network.hpp>
+#include <SFML/Graphics.hpp>
 
-class Player; //forward declarations
-class Enemy;
-
+// Struct representing a bullet
 struct Bullet {
-public: 
-	sf::Sprite m_bulletSprite;
-	std::string id;
-	sf::Vector2f m_velocity;
-	float m_speed;
-	float m_lifetime;
+public:
+    sf::Sprite m_bulletSprite;  // Sprite for the bullet
+    std::string id;             // Owner identifier for the bullet
+    sf::Vector2f m_velocity;    // Velocity vector
+    float m_speed;              // Speed of the bullet
+    float m_lifetime;           // Remaining lifetime of the bullet
 };
 
+// Damage dealt by a bullet
 static const float BULLET_DAMAGE = 10.f;
 
+// Creates a new bullet and adds it to the bullets vector
 void CreateBullet(std::vector<Bullet>& bullets, sf::Texture& bulletTex, sf::Vector2f spawnPos, std::string id, float spawnRot, float speed, float lifetime = 5.f);
 
-void UpdateBullets(std::vector<Bullet>& bullets, float deltaTime, bool check, Player* player = nullptr, Enemy* enemy = nullptr);
+// Updates the positions and lifetimes of bullets
+void UpdateBullets(std::vector<Bullet>& bullets, float deltaTime);
 
-void CheckCollisions(std::vector<Bullet>& bullets, Player* player, Enemy* enemy);
-
+// Renders all active bullets to the specified window
 void RenderBullets(std::vector<Bullet>& bullets, sf::RenderWindow& window);

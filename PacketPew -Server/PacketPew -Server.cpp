@@ -1,80 +1,79 @@
 //author: Kushagra
 
-//cpp headers
+// Standard C++ headers
 #include <iostream>
 #include <list>
 
-//sfml headers
+// SFML headers
 #include <SFML/Network.hpp>
 #include <SFML/Graphics.hpp>
 
-//custom headers
+// Custom headers
 #include "PacketExtension.h"
 
 using namespace std;
 
-const int SELECTOR_WAIT_TIME_MS = 200;
-const int MAX_CLIENTS = 2;
-const int SCREEN_WIDTH = 1280;
-const int SCREEN_HEIGHT = 720;
+// Constants for configuration
+const int SELECTOR_WAIT_TIME_MS = 200; // Selector wait time in milliseconds
+const int MAX_CLIENTS = 2;            // Maximum number of clients
+const int SCREEN_WIDTH = 1280;        // Game screen width
+const int SCREEN_HEIGHT = 720;        // Game screen height
 
+// Structure to hold client-related data
 struct ClientData {
-    sf::TcpSocket* socket;
-    unsigned sequenceNo;
-    sf::Vector2f position;
-    sf::Sprite playerSprite;
-    float rotation;
-    string id;
+    sf::TcpSocket* socket;    // TCP socket for the client
+    unsigned sequenceNo;      // Sequence number for updates
+    sf::Vector2f position;    // Current position of the client
+    sf::Sprite playerSprite;  // Player sprite for visualization
+    float rotation;           // Rotation angle of the client
+    string id;                // Unique ID for the client
 };
-ClientData clientDataArray[2];
-int index = 0;
+ClientData clientDataArray[2]; // Array to store data for 2 clients
+int index = 0;                 // Index for assigning client data
 
+// Structure to handle input data from clients
 struct ClientInputs {
-    sf::TcpSocket* socket;
-    unsigned sequenceNo;
-    sf::Vector2f moveDir;
-    float moveRate;
-    sf::Vector2f curPos;
-    sf::Vector2f newPos;
-    sf::Vector2f min, max;
-    float rot;
+    sf::TcpSocket* socket;     // Client's TCP socket
+    unsigned sequenceNo;       // Sequence number for the input
+    sf::Vector2f moveDir;      // Movement direction vector
+    float moveRate;            // Rate of movement
+    sf::Vector2f curPos;       // Current position
+    sf::Vector2f newPos;       // New position after movement
+    sf::Vector2f min, max;     // Boundary constraints (min and max)
+    float rot;                 // Rotation angle
 };
-list<ClientInputs> clientInputsList;
+list<ClientInputs> clientInputsList; // List to handle multiple client inputs
 
+// Structure to define bullet properties
 struct Bullet {
 public:
-    sf::Sprite bulletSprite;
-    sf::Vector2f pos;
-    std::string id;
-    sf::Vector2f m_velocity;
-    float m_speed;
-    float m_lifetime;
+    sf::Sprite bulletSprite;  // Bullet sprite
+    sf::Vector2f pos;         // Position of the bullet
+    std::string id;           // ID of the shooter
+    sf::Vector2f m_velocity;  // Bullet velocity vector
+    float m_speed;            // Bullet speed
+    float m_lifetime;         // Bullet lifetime in seconds
 };
-vector<Bullet> bullets;
+vector<Bullet> bullets; // Vector to store active bullets
 
+// Function declarations
 void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::TcpSocket& except, sf::Packet& sendPacket, sf::SocketSelector& selector);
 void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::Packet& sendPacket, sf::SocketSelector& selector);
+void EnemyDC(list<sf::TcpSocket*>& clients, sf::SocketSelector& selector);
 
-void EnemyDC(list<sf::TcpSocket*>& clients, sf::SocketSelector& selector) {
-    sf::Packet enemyDisconnected;
-    enemyDisconnected << "ENEMY_DC" << -1;
-    BroadcastToAll(clients, enemyDisconnected, selector);
-}
-
+// Function to broadcast a packet to all clients except one
 void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::TcpSocket& except, sf::Packet& sendPacket, sf::SocketSelector& selector) {
-    bool dc = false;
-    for (auto it = clients.begin(); it != clients.end(); ) {
+    bool dc = false; // Track disconnections
+    for (auto it = clients.begin(); it != clients.end();) {
         sf::TcpSocket& sendClient = **it;
         if (&sendClient == &except) {
-            cout << "skipping " << sendClient.getRemotePort() << endl;
-            ++it;
+            ++it; // Skip the client to be excluded
             continue;
         }
         sf::Socket::Status tcpSendStat = sendClient.send(sendPacket);
-
         if (tcpSendStat == sf::Socket::Disconnected) {
             cerr << "A client disconnected. Removing from the list.\n";
-            dc = true;
+            dc = true; // Mark disconnection
             selector.remove(sendClient);
             sendClient.disconnect();
             it = clients.erase(it);
@@ -88,12 +87,12 @@ void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::TcpSocket& except, sf::Pa
     }
 }
 
+// Overloaded function to broadcast a packet to all clients
 void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::Packet& sendPacket, sf::SocketSelector& selector) {
     bool dc = false;
-    for (auto it = clients.begin(); it != clients.end(); ) {
+    for (auto it = clients.begin(); it != clients.end();) {
         sf::TcpSocket& sendClient = **it;
         sf::Socket::Status tcpSendStat = sendClient.send(sendPacket);
-
         if (tcpSendStat == sf::Socket::Disconnected) {
             cerr << "A client disconnected. Removing from the list.\n";
             dc = true;
@@ -110,50 +109,54 @@ void BroadcastToAll(list<sf::TcpSocket*>& clients, sf::Packet& sendPacket, sf::S
     }
 }
 
+// Function to handle enemy disconnection and broadcast to remaining clients
+void EnemyDC(list<sf::TcpSocket*>& clients, sf::SocketSelector& selector) {
+    sf::Packet enemyDisconnected;
+    enemyDisconnected << "ENEMY_DC" << -1; // Packet indicating disconnection
+    BroadcastToAll(clients, enemyDisconnected, selector);
+}
+
+// Function to receive data from a client
 sf::Packet RecieveFromClient(sf::TcpSocket& client, list<sf::TcpSocket*>& clients, sf::SocketSelector& selector) {
     sf::Packet clientDataPacket;
     sf::Socket::Status tcpRecvStat = client.receive(clientDataPacket);
     if (tcpRecvStat == sf::Socket::Disconnected) {
-        //error...
         cerr << "A client disconnected\n";
         clients.remove(&client);
         selector.remove(client);
         client.disconnect();
-        printf("waiting for a new connection\n");
         EnemyDC(clients, selector);
         sf::Packet returnPacket;
-        returnPacket << -1;
+        returnPacket << -1; // Return error packet
         return returnPacket;
     }
     if (tcpRecvStat == sf::Socket::NotReady) {
         sf::Packet returnPacket;
-        returnPacket << 0;
+        returnPacket << 0; // Not ready packet
         return returnPacket;
     }
-    
-    return clientDataPacket;
+    return clientDataPacket; // Return received packet
 }
 
+// Function to add new clients to the server
 void AddClients(sf::TcpListener& serverListener, list<sf::TcpSocket*>& clients, sf::SocketSelector& selector) {
     auto* client = new sf::TcpSocket();
     sf::Packet welcomePacket;
     string msg;
     if (serverListener.accept(*client) == sf::Socket::Done) {
         if (clients.size() < MAX_CLIENTS) {
-            msg = to_string(clients.size() + 1);
+            msg = to_string(clients.size() + 1); // Assign client number
             welcomePacket << msg;
-            if (client->send(welcomePacket) == sf::Socket::Done) {
-                printf("A client connected at port %d and address %s\n", client->getRemotePort(), client->getRemoteAddress().toString().data());
-                clients.push_back(client);
-                clientDataArray[index % 2].socket = client;
-                clientDataArray[index % 2].id = "player" + to_string((index % 2) + 1);
-                index++;
-                std::cout << "Total clients connected " << clients.size() << std::endl;
-                selector.add(*client);
-            }
+            client->send(welcomePacket);
+            clients.push_back(client);
+            clientDataArray[index % 2].socket = client;
+            clientDataArray[index % 2].id = "player" + to_string((index % 2) + 1);
+            index++;
+            selector.add(*client);
+            printf("Client connected: Port %d, Address %s\n", client->getRemotePort(), client->getRemoteAddress().toString().c_str());
         }
         else {
-            msg = "-1";
+            msg = "-1"; // Server full message
             welcomePacket << msg;
             client->send(welcomePacket);
             client->disconnect();
@@ -165,6 +168,7 @@ void AddClients(sf::TcpListener& serverListener, list<sf::TcpSocket*>& clients, 
     }
 }
 
+// Broadcasting enemy connected
 void BroadcastEnemies(list<sf::TcpSocket*>& clients, sf::SocketSelector& selector) {
     sf::Packet enemiesData;
     int enemies = clients.size() - 1;
@@ -172,6 +176,7 @@ void BroadcastEnemies(list<sf::TcpSocket*>& clients, sf::SocketSelector& selecto
     BroadcastToAll(clients, enemiesData, selector);
 }
 
+// Calculating new positions for the clients
 sf::Vector2f PerformMove(sf::Vector2f moveDir, float moveRate, sf::Vector2f curPlayerPos, sf::Vector2f min, sf::Vector2f max) {
     int dx = (moveDir.x != 0) ? moveDir.x / abs(moveDir.x) : 0;
     int dy = (moveDir.y != 0) ? moveDir.y / abs(moveDir.y) : 0;
@@ -183,6 +188,7 @@ sf::Vector2f PerformMove(sf::Vector2f moveDir, float moveRate, sf::Vector2f curP
     return sf::Vector2f(clampedPosX, clampedPosY);
 }
 
+// Function to create a bullet
 void CreateBullet(std::vector<Bullet>& bullets, sf::Texture bulletTex, sf::Vector2f spawnPos, std::string id, float spawnRot, float speed, float lifetime) {
     Bullet bullet;
     bullet.bulletSprite.setTexture(bulletTex);
@@ -190,13 +196,13 @@ void CreateBullet(std::vector<Bullet>& bullets, sf::Texture bulletTex, sf::Vecto
     bullet.bulletSprite.setPosition(spawnPos);
     bullet.m_speed = speed;
     bullet.id = id;
-    bullet.pos = spawnPos;
     float angleRad = spawnRot * 3.14159f / 180.f;
     bullet.m_velocity = sf::Vector2f(std::cos(angleRad) * bullet.m_speed, std::sin(angleRad) * bullet.m_speed);
     bullet.m_lifetime = lifetime;
     bullets.push_back(bullet);
 }
 
+// Checking bullet collision with client
 void CheckCollision(std::list<sf::TcpSocket*> clients, sf::SocketSelector selector) {
     bool hit = false;
     for (auto it = bullets.begin(); it != bullets.end();) {
@@ -222,6 +228,7 @@ void CheckCollision(std::list<sf::TcpSocket*> clients, sf::SocketSelector select
     }
 }
 
+// Updating bullet position
 void UpdateBullets(std::list<sf::TcpSocket*> clients, sf::SocketSelector selector, float deltaTime) {
     CheckCollision(clients, selector);
     for (auto it = bullets.begin(); it != bullets.end();) {
@@ -404,7 +411,7 @@ int main()
                 }
                 if (broadcastClock.getElapsedTime() >= broadcastTime) {
                     if (!clientInputsList.empty()) {
-                        for (auto &input : clientInputsList) {
+                        for (auto& input : clientInputsList) {
                             input.newPos = PerformMove(input.moveDir, input.moveRate, input.curPos, input.min, input.max);
                             for (auto& client : clientDataArray) {
                                 if (input.socket == client.socket) {

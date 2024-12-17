@@ -1,26 +1,30 @@
-//author: Kushagra
+// author: Kushagra
 
-//Texture header file
+// Texture header file
 
 #pragma once
 
-//cpp headers
-#include<iostream>
+// Standard C++ headers
+#include <iostream>
 
-//sfml headers
-#include<SFML/Network.hpp>
-#include<SFML/Graphics.hpp>
+// SFML headers
+#include <SFML/Network.hpp>
+#include <SFML/Graphics.hpp>
 
 using namespace std;
 
+// A wrapper class for managing SFML textures
 class Texture {
-public: 
-	Texture();
+public:
+    // Default constructor
+    Texture();
 
-	bool CreateTexture(string texName, bool smooth = false, bool repeated = true);
+    // Creates a texture by loading it from a file
+    bool CreateTexture(string texName, bool smooth = false, bool repeated = true);
 
-	sf::Texture& getTex();
+    // Returns a reference to the SFML texture
+    sf::Texture& getTex();
 
 private:
-	sf::Texture m_tex;
+    sf::Texture m_tex; // The underlying SFML texture object
 };

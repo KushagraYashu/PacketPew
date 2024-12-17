@@ -1,34 +1,38 @@
-//author: Kushagra
+// author: Kushagra
 
 #pragma once
 
-//cpp headers
+// Standard C++ headers
 #include <iostream>
 
-//sfml headers
-#include<SFML/Network.hpp>
-#include<SFML/Graphics.hpp>
+// SFML headers
+#include <SFML/Network.hpp>
+#include <SFML/Graphics.hpp>
 
-//custom headers
+// Custom headers
 #include "CustomTexture.h"
 
-using namespace std;
+// Default constructor for the Texture class
+Texture::Texture() {}
 
-Texture::Texture() {
-	
-}
-
+// Create a texture by loading it from a file
 bool Texture::CreateTexture(string texName, bool smooth, bool repeated) {
-	string texPath = "Textures/";
-	texPath.append(texName);
-	if (!m_tex.loadFromFile(texPath)) {
-		return false;
-	}
-	m_tex.setSmooth(smooth);
-	m_tex.setRepeated(repeated);
-	return true;
+    // Construct the file path
+    string texPath = "Textures/" + texName;
+
+    // Attempt to load the texture from the specified file
+    if (!m_tex.loadFromFile(texPath)) {
+        return false; // Return false if loading failed
+    }
+
+    // Apply texture properties
+    m_tex.setSmooth(smooth);
+    m_tex.setRepeated(repeated);
+
+    return true; // Return true if the texture was successfully loaded
 }
 
+// Accessor for the underlying SFML texture object
 sf::Texture& Texture::getTex() {
-	return m_tex;
+    return m_tex;
 }
