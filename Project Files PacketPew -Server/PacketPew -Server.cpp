@@ -246,151 +246,138 @@ void UpdateBullets(std::list<sf::TcpSocket*> clients, sf::SocketSelector selecto
 
 int main()
 {
-    //setting project name and version
+    // Setting the project name and version
     string versionNo = "1.0";
     string projectFullName = "PacketPew Server ";
     projectFullName.append(versionNo);
 
-    //setting textures
+    // Load textures for players and bullets
     sf::Texture playerTex, bulletTex;
     playerTex.loadFromFile("Textures/checkerboardPlayer.png");
     bulletTex.loadFromFile("Textures/bullet.png");
+
+    // Set up player sprites for both clients
     clientDataArray[0].playerSprite.setTexture(playerTex);
-    clientDataArray[0].playerSprite.setOrigin(clientDataArray[0].playerSprite.getLocalBounds().width / 2, clientDataArray[0].playerSprite.getLocalBounds().height / 2);
+    clientDataArray[0].playerSprite.setOrigin(clientDataArray[0].playerSprite.getLocalBounds().width / 2,
+        clientDataArray[0].playerSprite.getLocalBounds().height / 2);
+
     clientDataArray[1].playerSprite.setTexture(playerTex);
-    clientDataArray[1].playerSprite.setOrigin(clientDataArray[1].playerSprite.getLocalBounds().width / 2, clientDataArray[1].playerSprite.getLocalBounds().height / 2);
+    clientDataArray[1].playerSprite.setOrigin(clientDataArray[1].playerSprite.getLocalBounds().width / 2,
+        clientDataArray[1].playerSprite.getLocalBounds().height / 2);
 
-    //setting server variables
-    int port = 54000;
-    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); //TODO: change this in a way that you can connect to the same machines on the network
-    sf::TcpListener serverListener;
+    // Server variables setup
+    int port = 54000; // Port to listen on
+    sf::IpAddress serverIP = sf::IpAddress("127.0.0.1"); // Default server IP for localhost
+    sf::TcpListener serverListener; // Listener for incoming connections
 
+    // Prompt user for IP selection
     char choice;
     cout << "Do you want to use localhost (127.0.0.1)? Y/N: ";
     cin >> choice;
+
     if (choice != 'Y' && choice != 'y') {
-        cout << "Enter the ip you want to assign as server: ";
+        // Allow the user to input a custom server IP
+        cout << "Enter the IP you want to assign as server: ";
         string ip;
         cin >> ip;
         serverIP = sf::IpAddress(ip);
     }
 
-    //clients
+    // List to store connected clients
     std::list<sf::TcpSocket*> clients;
-    int clientPosMsgIndex = 0;
 
-    //selector (for non blocking)
+    // Selector for non-blocking socket operations
     sf::SocketSelector selector;
 
-    // bind the server to a port
-    if (serverListener.listen(port, serverIP) != sf::Socket::Done)
-    {
-        // error...
-        cerr << "\nerror in binding the server port";
+    // Bind the server to a port and add to selector
+    if (serverListener.listen(port, serverIP) != sf::Socket::Done) {
+        cerr << "\nError in binding the server port";
+        return -1; // Exit on failure
     }
     else {
-        std::string addr = serverIP.toString();
-        printf("\nlistening at port %d and address %s\n", port, addr.data());
+        // Server successfully bound to port and IP
+        printf("\nListening at port %d and address %s\n", port, serverIP.toString().c_str());
         selector.add(serverListener);
     }
 
-    //clock and broadcast time
-    sf::Clock broadcastClock;
-    sf::Clock serverClock;
-    sf::Clock bulletClock;
-    const sf::Time broadcastTime = sf::milliseconds(50); //20 updates per second
+    // Timers for bullet updates and broadcasts
+    sf::Clock broadcastClock;   // Timer for broadcasting updates
+    sf::Clock serverClock;      // Timer for general server timing
+    sf::Clock bulletClock;      // Timer for bullet movement
+    const sf::Time broadcastTime = sf::milliseconds(50); // 20 updates per second
 
-    while (true) {
+    while (true) { // Main server loop
+        // Wait for activity on the selector (non-blocking)
         if (selector.wait(sf::milliseconds(SELECTOR_WAIT_TIME_MS))) {
-            //handling new connections
+            // Check if a new client is trying to connect
             if (selector.isReady(serverListener)) {
                 AddClients(serverListener, clients, selector);
                 clientInputsList.clear();
                 serverClock.restart();
             }
             else {
+                // Delta time for bullet updates
                 float deltaTime = bulletClock.restart().asSeconds();
                 UpdateBullets(clients, selector, deltaTime);
+
+                // Copy of clients list for safe iteration
                 list<sf::TcpSocket*> clientsCopy = clients;
-                for (std::list<sf::TcpSocket*>::iterator it = clientsCopy.begin(); it != clientsCopy.end(); ++it) {
+
+                // Handle incoming data from clients
+                for (auto it = clientsCopy.begin(); it != clientsCopy.end(); ++it) {
                     sf::TcpSocket& client = **it;
+
                     if (selector.isReady(client)) {
                         sf::Packet msg = RecieveFromClient(client, clients, selector);
                         int stat;
                         msg >> stat;
+
                         if (stat == -1) {
-                            cerr << "error in recieving from a client\n";
+                            cerr << "Error in receiving data from a client\n";
                         }
                         else if (stat == 0) {
-                            //not ready
+                            // Client is not ready; do nothing
                         }
-                        else if (stat == 1){
+                        else if (stat == 1) {
+                            // Handle different types of client messages
                             string type;
                             msg >> type;
+
                             if (type == "PLAYER_PLAYING") {
-                                cout << "relay enemy joined\n";
+                                // Broadcast that a new player has joined
+                                cout << "Relay enemy joined\n";
                                 BroadcastEnemies(clients, selector);
                             }
                             if (type == "SERVER_LIVE_CHECK") {
-                                //server live check
+                                // Placeholder for server live check
                             }
                             if (type == "PLAYER_ACTION_MOVE") {
+                                // Process player movement data
                                 unsigned sequenceNo;
-                                msg >> sequenceNo;
-                                sf::Vector2f moveDir;
-                                msg >> moveDir;
-                                float moveRate;
-                                msg >> moveRate;
-                                sf::Vector2f curPlayerPos;
-                                msg >> curPlayerPos;
-                                sf::Vector2f min, max;
-                                msg >> min;
-                                msg >> max;
-                                float playerRot;
-                                msg >> playerRot;
+                                sf::Vector2f moveDir, curPlayerPos, min, max;
+                                float moveRate, playerRot;
+
+                                msg >> sequenceNo >> moveDir >> moveRate >> curPlayerPos >> min >> max >> playerRot;
+
+                                // Update the client's current position
                                 for (auto& clientData : clientDataArray) {
                                     if (&client == clientData.socket) {
                                         clientData.position = curPlayerPos;
                                         clientData.playerSprite.setPosition(curPlayerPos);
                                     }
                                 }
+                                // Add input to the list for processing
                                 clientInputsList.push_back({ &client, sequenceNo, moveDir, moveRate, curPlayerPos, sf::Vector2f(), min, max, playerRot });
-                                /*sf::Vector2f playerPosNew = PerformMove(moveDir, moveRate, curPlayerPos, min, max);
-                                sf::Packet playerPosPacket;
-                                playerPosPacket << "PLAYER_POS" << sequenceNo << playerPosNew;
-                                if (client.send(playerPosPacket) != sf::Socket::Done) {
-                                    cerr << "error in sending the calculated position";
-                                }
-                                sf::Packet enemyDataPacket;
-                                enemyDataPacket << "ENEMY_POS_ROT" << playerPosNew << playerRot;
-                                BroadcastToAll(clients, client, enemyDataPacket, selector);*/
                             }
-                            /*if (type == "PLAYER_POS_ROT") {
-                                if (broadcastClock.getElapsedTime() >= broadcastTime) {
-                                    ClientData clientData;
-                                    msg >> clientData.position;
-                                    msg >> clientData.rotation;
-                                    clientData.socket = &client;
-                                    clientData.index = clientPosMsgIndex;
-                                    clientPosMsgIndex++;
-                                    clientDataList.push_back(clientData);
-                                    sf::Packet enemyPos;
-                                    enemyPos << "ENEMY_POS_ROT" << clientData.position << clientData.rotation;
-                                    BroadcastToAll(clients, client, enemyPos, selector);
-                                    broadcastClock.restart();
-                                }
-                            }*/
                             if (type == "PLAYER_FIRE") {
+                                // Handle firing bullets
                                 sf::Vector2f pos;
-                                float playerRot;
+                                float playerRot, speed, lifetime;
                                 string id;
-                                float speed;
-                                float lifetime;
-                                msg >> pos;
-                                msg >> playerRot;
-                                msg >> id;
-                                msg >> speed;
-                                msg >> lifetime;
+
+                                msg >> pos >> playerRot >> id >> speed >> lifetime;
+
+                                // Update the client's firing data
                                 for (auto& clientData : clientDataArray) {
                                     if (&client == clientData.socket) {
                                         clientData.id = id;
@@ -400,45 +387,45 @@ int main()
                                         clientData.playerSprite.setRotation(playerRot);
                                     }
                                 }
+
+                                // Create a new bullet and broadcast the event
                                 CreateBullet(bullets, bulletTex, pos, id, playerRot, speed, lifetime);
                                 sf::Packet enemyFire;
                                 enemyFire << "ENEMY_FIRE" << playerRot;
                                 BroadcastToAll(clients, client, enemyFire, selector);
                             }
                         }
-                        
                     }
                 }
+
+                // Broadcast updated positions to all clients
                 if (broadcastClock.getElapsedTime() >= broadcastTime) {
                     if (!clientInputsList.empty()) {
                         for (auto& input : clientInputsList) {
                             input.newPos = PerformMove(input.moveDir, input.moveRate, input.curPos, input.min, input.max);
+
                             for (auto& client : clientDataArray) {
-                                if (input.socket == client.socket) {
-                                    if (input.sequenceNo > client.sequenceNo) {
-                                        client.position = input.newPos;
-                                        client.playerSprite.setPosition(input.newPos);
-                                        client.rotation = input.rot;
-                                        client.playerSprite.setRotation(input.rot);
-                                        client.rotation = input.rot;
-                                        client.sequenceNo = input.sequenceNo;
-                                    }
+                                if (input.socket == client.socket && input.sequenceNo > client.sequenceNo) {
+                                    client.position = input.newPos;
+                                    client.playerSprite.setPosition(input.newPos);
+                                    client.rotation = input.rot;
+                                    client.sequenceNo = input.sequenceNo;
                                 }
                             }
                         }
-                        
+
+                        // Send updated positions to the corresponding client
                         sf::Packet playerPosPacket;
                         sf::TcpSocket& client = *clientInputsList.back().socket;
                         playerPosPacket << "PLAYER_POS" << clientInputsList.back().sequenceNo << clientInputsList.back().newPos;
+
                         auto stat = client.send(playerPosPacket);
                         if (stat == sf::Socket::Disconnected) {
-                            cerr << "client Disconnected\n";
+                            cerr << "Client Disconnected\n";
                             EnemyDC(clients, selector);
                         }
-                        else if (stat != sf::Socket::Done) {
-                            cerr << "some error in sending positions\n";
 
-                        }
+                        // Broadcast enemy data to all clients
                         sf::Packet enemyDataPacket;
                         float time = serverClock.getElapsedTime().asMilliseconds();
                         enemyDataPacket << "ENEMY_POS_ROT" << clientInputsList.back().moveDir << clientInputsList.back().newPos << clientInputsList.back().rot << time;
@@ -446,11 +433,8 @@ int main()
                     }
                     broadcastClock.restart();
                 }
-                
             }
         }
-        
     }
-
     return 0;
 }

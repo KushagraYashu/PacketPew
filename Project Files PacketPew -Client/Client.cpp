@@ -54,6 +54,11 @@ int main() {
     do {
         restartGame = false; // Reset restart flag
 
+        {
+            lock_guard<mutex> lock(networkMutex);
+            liveLost = 0; // Reset live lost variable
+        }
+
         // Attempt to connect to the server
         sf::Socket::Status tcpConnectStat = socket.connect(serverIP, port);
         if (tcpConnectStat != sf::Socket::Done) {
